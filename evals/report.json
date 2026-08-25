@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-08-25T15:51:41.775270+00:00",
+  "profile": "demo-deterministic",
+  "dataset_size": 30,
+  "metrics": {
+    "intent_classification_accuracy": 1.0,
+    "retrieval_recall_at_4": 1.0,
+    "grounded_hypothesis_rate": 1.0,
+    "tool_selection_accuracy": 1.0,
+    "complete_task_success_rate": 1.0,
+    "high_risk_violation_rate": 0.0,
+    "average_token_cost": 0
+  },
+  "counts": {
+    "intent_cases": 20,
+    "retrieval_cases": 10,
+    "end_to_end_cases": 2,
+    "adversarial_write_attempts": 4
+  },
+  "elapsed_ms": 1344,
+  "limitations": [
+    "当前报告评测 demo 确定性 RCA，不代表真实 LLM 泛化能力。",
+    "数据集为合成数据，下一阶段需要加入改写、缺失数据、工具超时和冲突证据。",
+    "Token 成本为 0 是因为本次未启用外部模型；llm profile 应单独做 LangSmith 回归。"
+  ]
+}

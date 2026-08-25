@@ -1,0 +1,185 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root-factorypilot
+      MYSQL_DATABASE: factorypilot
+      MYSQL_USER: factorypilot
+      MYSQL_PASSWORD: factorypilot
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    ports: ["3307:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ufactorypilot -pfactorypilot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls=http://0.0.0.0:2379 --data-dir /etcd
+    volumes: ["etcd-data:/etcd"]
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data --console-address ":9001"
+    volumes: ["minio-data:/minio_data"]
+
+  milvus:
+    image: milvusdb/milvus:v2.6.4
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports: ["19531:19530", "9092:9091"]
+    volumes: ["milvus-data:/var/lib/milvus"]
+    depends_on: [etcd, minio]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  agent-service:
+    build: ./agent-service
+    environment:
+      APP_ENV: production
+      DATA_BACKEND: mysql
+      DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
+      CHECKPOINT_PATH: /data/checkpoints.db
+      KNOWLEDGE_BACKEND: milvus
+      MILVUS_URI: http://milvus:19530
+      MILVUS_COLLECTION: factorypilot_knowledge
+      MILVUS_FAIL_OPEN: "false"
+      TOOL_TRANSPORT: mcp
+      MES_MCP_URL: http://mes-mcp:8101/mcp
+      KNOWLEDGE_MCP_URL: http://knowledge-mcp:8102/mcp
+      ACTION_MCP_URL: http://action-mcp:8103/mcp
+      REQUIRE_GATEWAY_AUTH: "true"
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-factorypilot-compose-shared-secret}
+      AGENT_MODE: ${AGENT_MODE:-demo}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      LLM_FAIL_OPEN: ${LLM_FAIL_OPEN:-true}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,mysql,milvus,mes-mcp,knowledge-mcp,action-mcp,mes-gateway}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      LANGSMITH_WORKSPACE_ID: ${LANGSMITH_WORKSPACE_ID:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-factorypilot}
+    volumes: ["checkpoint-data:/data"]
+    ports: ["8001:8000"]
+    depends_on:
+      mysql: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  mes-mcp:
+    build: ./agent-service
+    command: ["factorypilot-mes-mcp"]
+    environment:
+      DATA_BACKEND: mysql
+      DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8101
+      MCP_ALLOWED_HOSTS: mes-mcp:8101,localhost:*,127.0.0.1:*
+    ports: ["8101:8101"]
+    depends_on:
+      agent-service: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from factorypilot.mcp_client_tools import MCPRemoteCaller; MCPRemoteCaller('http://127.0.0.1:8101/mcp', 3, 1).call('health', {})"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  knowledge-mcp:
+    build: ./agent-service
+    command: ["factorypilot-knowledge-mcp"]
+    environment:
+      DATA_BACKEND: mysql
+      DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
+      KNOWLEDGE_BACKEND: milvus
+      MILVUS_URI: http://milvus:19530
+      MILVUS_COLLECTION: factorypilot_knowledge
+      MILVUS_FAIL_OPEN: "false"
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8102
+      MCP_ALLOWED_HOSTS: knowledge-mcp:8102,localhost:*,127.0.0.1:*
+    ports: ["8102:8102"]
+    depends_on:
+      agent-service: {condition: service_healthy}
+      milvus: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from factorypilot.mcp_client_tools import MCPRemoteCaller; MCPRemoteCaller('http://127.0.0.1:8102/mcp', 3, 1).call('health', {})"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  action-mcp:
+    build: ./agent-service
+    command: ["factorypilot-action-mcp"]
+    environment:
+      DATA_BACKEND: mysql
+      DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8103
+      MCP_ALLOWED_HOSTS: action-mcp:8103,localhost:*,127.0.0.1:*
+    ports: ["8103:8103"]
+    depends_on:
+      agent-service: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from factorypilot.mcp_client_tools import MCPRemoteCaller; MCPRemoteCaller('http://127.0.0.1:8103/mcp', 3, 1).call('health', {})"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  mes-gateway:
+    build: ./mes-gateway
+    environment:
+      AGENT_SERVICE_URL: http://agent-service:8000
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-factorypilot-compose-shared-secret}
+      JWT_SECRET: ${JWT_SECRET:-factorypilot-compose-jwt-secret-change-before-production}
+      SECURE_COOKIE: "false"
+    ports: ["8080:8080"]
+    depends_on:
+      agent-service: {condition: service_healthy}
+      mes-mcp: {condition: service_healthy}
+      knowledge-mcp: {condition: service_healthy}
+      action-mcp: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:80"]
+    depends_on:
+      mes-gateway: {condition: service_healthy}
+
+volumes:
+  mysql-data:
+  etcd-data:
+  minio-data:
+  milvus-data:
+  checkpoint-data:

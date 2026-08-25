@@ -1,0 +1,22 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: factorypilot-mes-gateway
+
+factorypilot:
+  agent-service:
+    base-url: ${AGENT_SERVICE_URL:http://localhost:8000}
+    shared-secret: ${GATEWAY_SHARED_SECRET:change-this-in-production}
+  security:
+    jwt-secret: ${JWT_SECRET:factorypilot-demo-jwt-secret-change-me-2026}
+    token-ttl-seconds: ${JWT_TTL_SECONDS:28800}
+    secure-cookie: ${SECURE_COOKIE:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
