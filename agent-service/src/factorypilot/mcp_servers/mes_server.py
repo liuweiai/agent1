@@ -37,8 +37,8 @@ def get_recent_alerts(run_id: str, device_id: str, hours: int = 24, limit: int =
 
 
 @mcp.tool(structured_output=True)
-def get_recent_quality(run_id: str, line_id: str, limit: int = 12) -> list[dict[str, Any]]:
-    """查询产线最近批次良率与缺陷类型。"""
+def get_recent_quality(run_id: str, line_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """查询最近批次良率、缺陷与受控过程参数。"""
     return tools.get_recent_quality(run_id, line_id, limit)
 
 

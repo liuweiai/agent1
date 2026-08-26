@@ -36,6 +36,14 @@ def test_approval_executes_allowlisted_actions(tmp_path: Path) -> None:
         pending = wait_for_status(service, run["id"], {"awaiting_approval"})
         assert pending["risk_level"] == "high"
         assert pending["state"]["hypotheses"][0]["confidence"] >= 0.8
+        analysis = pending["state"]["production_analysis"]
+        assert analysis["window_size"] == 20
+        assert analysis["baseline"]["average_yield"] > 97
+        assert analysis["anomaly"]["average_yield"] < 95
+        assert analysis["alarm_overlap"]["overlap"] is True
+        assert {"STAT-WINDOW-1", "STAT-CORR-1", "STAT-TIME-1"}.issubset(
+            {item["id"] for item in pending["state"]["evidence"]}
+        )
 
         approval = service.approve(
             run["id"], ApprovalRequest(approved=True, approver="测试主管", comment="批准模拟处置")
@@ -44,6 +52,9 @@ def test_approval_executes_allowlisted_actions(tmp_path: Path) -> None:
         completed = wait_for_status(service, run["id"], {"completed"})
         assert completed["report"]["data_notice"].startswith("本报告")
         assert len(completed["state"]["action_results"]) == 2
+        assert completed["state"]["production_analysis"]["recovery_validation"][
+            "current_consecutive_batches"
+        ] == 2
         writes = service.database.fetch_all(
             "SELECT operation FROM audit_logs WHERE run_id=? AND tool='action-mcp'", (run["id"],)
         )

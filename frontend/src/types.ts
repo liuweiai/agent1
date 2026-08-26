@@ -20,11 +20,50 @@ export interface TimelineEvent {
 
 export interface Evidence {
   id: string
-  source_type: 'mes' | 'alarm' | 'quality' | 'maintenance' | 'knowledge'
+  source_type: 'mes' | 'alarm' | 'quality' | 'maintenance' | 'knowledge' | 'analytics'
   title: string
   excerpt: string
   source_ref: string
   score: number
+}
+
+export interface ProductionAnalysis {
+  method: string
+  window_size: number
+  release_threshold: number
+  trend: Array<{
+    batch_id: string
+    started_at: string
+    yield_rate: number
+    defect_rate: number
+    marking_speed?: number | null
+    laser_power_percent?: number | null
+    temperature_c?: number | null
+    defect_type?: string | null
+  }>
+  baseline: { count: number; average_yield?: number | null; average_defect_rate?: number | null }
+  anomaly: { count: number; average_yield?: number | null; average_defect_rate?: number | null }
+  yield_change_pp?: number | null
+  correlations: Record<string, {
+    label: string
+    coefficient?: number | null
+    interpretation: string
+  }>
+  alarm_overlap: {
+    window_hours: number
+    overlap: boolean
+    matched_alarm_count: number
+    closest_delta_minutes?: number | null
+  }
+  evidence_quality: { sufficient: boolean; limitations: string[] }
+  recovery_validation: {
+    status: 'pending' | 'observing' | 'passed'
+    threshold: number
+    required_consecutive_batches: number
+    observed_batches?: number[]
+    current_consecutive_batches?: number
+    release_condition_met?: boolean
+  }
 }
 
 export interface Hypothesis {
@@ -60,10 +99,14 @@ export interface RunDetail extends RunSummary {
     action_plan?: ActionItem[]
     quality?: Array<{
       batch_id: string
+      started_at: string
       yield_rate: number
       marking_speed: number
+      laser_power_percent?: number
+      temperature_c?: number
       defect_type: string
     }>
+    production_analysis?: ProductionAnalysis
     verification?: {
       mode: string
       baseline_yield: number

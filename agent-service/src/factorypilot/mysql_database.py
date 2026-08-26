@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS batches (
     good_qty INT NOT NULL, marking_speed INT NOT NULL, material_lot VARCHAR(64) NOT NULL,
     INDEX idx_batches_line_time(line_id, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS process_metrics (
+    batch_id VARCHAR(64) PRIMARY KEY, laser_power_percent DECIMAL(6,2) NOT NULL,
+    temperature_c DECIMAL(6,2) NOT NULL, recorded_at VARCHAR(40) NOT NULL,
+    CONSTRAINT fk_metric_batch FOREIGN KEY(batch_id) REFERENCES batches(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS inspections (
     id BIGINT PRIMARY KEY AUTO_INCREMENT, batch_id VARCHAR(64) NOT NULL, device_id VARCHAR(64) NOT NULL,
     defect_type VARCHAR(64) NOT NULL, inspected_qty INT NOT NULL, defect_qty INT NOT NULL,
@@ -168,6 +173,7 @@ class MySQLDatabase(Database):
             cursor.close()
             if int(row["count"]) == 0:
                 self._seed(connection)  # Database._seed uses only execute/executemany here.
+            self._ensure_process_metrics(connection)
 
 
 def create_database(settings: Any) -> Database:

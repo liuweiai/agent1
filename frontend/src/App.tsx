@@ -197,6 +197,7 @@ function App() {
   const evidence = run?.state.evidence ?? []
   const hypotheses = run?.state.hypotheses ?? []
   const topCause = hypotheses[0]
+  const productionAnalysis = run?.state.production_analysis
   const canApprove = !AUTH_ENABLED || Boolean(user?.roles.some((role) => ['SUPERVISOR', 'ADMIN'].includes(role)))
 
   const chartOption = useMemo(() => {
@@ -378,10 +379,56 @@ function App() {
                     </Col>
                     <Col xs={24} lg={14}>
                       <Space direction="vertical" size={20} style={{ width: '100%' }}>
-                        <Card className="surface" bordered={false} title="良率趋势与验证窗口">
+                        <Card className="surface" bordered={false} title="最近20批次良率趋势与验证窗口">
                           {(run.state.quality?.length ?? 0) > 0 ? <ReactECharts option={chartOption} style={{ height: 280 }} /> : <Empty description="等待质量数据" />}
                           {run.state.verification && <Alert type="info" showIcon message={run.state.verification.note} />}
                         </Card>
+
+                        {productionAnalysis && (
+                          <Card className="surface analytics-card" bordered={false} title="确定性生产统计证据">
+                            <Row gutter={[12, 12]}>
+                              <Col xs={12} md={6}>
+                                <Statistic title={`稳定基线 · ${productionAnalysis.baseline.count}批`} value={productionAnalysis.baseline.average_yield ?? '--'} suffix="%" precision={2} />
+                              </Col>
+                              <Col xs={12} md={6}>
+                                <Statistic title={`异常窗口 · ${productionAnalysis.anomaly.count}批`} value={productionAnalysis.anomaly.average_yield ?? '--'} suffix="%" precision={2} valueStyle={{ color: '#ff728b' }} />
+                              </Col>
+                              <Col xs={12} md={6}>
+                                <Statistic title="良率下降" value={Math.abs(productionAnalysis.yield_change_pp ?? 0)} suffix="pp" precision={2} valueStyle={{ color: '#ffb84d' }} />
+                              </Col>
+                              <Col xs={12} md={6}>
+                                <Statistic title={`告警重合 · ±${productionAnalysis.alarm_overlap.window_hours}h`} value={productionAnalysis.alarm_overlap.overlap ? '是' : '否'} suffix={productionAnalysis.alarm_overlap.overlap ? `${productionAnalysis.alarm_overlap.matched_alarm_count}条` : ''} />
+                              </Col>
+                            </Row>
+                            <Divider />
+                            <div className="correlation-grid">
+                              {Object.values(productionAnalysis.correlations).map((item) => (
+                                <div className="correlation-item" key={item.label}>
+                                  <Text type="secondary">{item.label}</Text>
+                                  <Space>
+                                    <Text strong>r = {item.coefficient ?? 'N/A'}</Text>
+                                    <Tag color={item.coefficient != null && Math.abs(item.coefficient) >= 0.7 ? 'green' : 'blue'}>{item.interpretation}</Tag>
+                                  </Space>
+                                </div>
+                              ))}
+                            </div>
+                            <Alert
+                              className="analytics-alert"
+                              type={productionAnalysis.evidence_quality.sufficient ? 'success' : 'warning'}
+                              showIcon
+                              message={productionAnalysis.evidence_quality.sufficient ? '统计证据充分，可交给 RCA Agent 进行因果假设' : '统计证据不足，需要人工补充数据'}
+                              description={productionAnalysis.evidence_quality.limitations.join('；') || `方法：${productionAnalysis.method}。LLM 只能引用这些计算结果，不能自行修改统计结论。`}
+                            />
+                            <Alert
+                              className="analytics-alert"
+                              type={productionAnalysis.recovery_validation.status === 'passed' ? 'success' : 'info'}
+                              showIcon
+                              message={productionAnalysis.recovery_validation.status === 'pending'
+                                ? '处置后连续三批恢复验证：等待执行'
+                                : `连续达标 ${productionAnalysis.recovery_validation.current_consecutive_batches ?? 0}/${productionAnalysis.recovery_validation.required_consecutive_batches} 批`}
+                            />
+                          </Card>
+                        )}
 
                         {topCause && (
                           <Card className="surface cause-card" bordered={false} title="首要根因假设">
@@ -497,6 +544,7 @@ function EvidencePanel({ evidence }: { evidence: Evidence[] }) {
     quality: { text: '质量', color: 'cyan' },
     maintenance: { text: '维修', color: 'purple' },
     knowledge: { text: 'SOP / 手册', color: 'green' },
+    analytics: { text: '统计分析', color: 'gold' },
   }
   return (
     <Card className="surface" bordered={false} title={<span><FileSearchOutlined /> 证据与段落引用</span>} extra={<Text type="secondary">所有结论可回溯</Text>}>

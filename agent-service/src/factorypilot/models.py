@@ -34,7 +34,7 @@ class ApprovalRequest(BaseModel):
 
 class Evidence(BaseModel):
     id: str
-    source_type: Literal["mes", "alarm", "quality", "maintenance", "knowledge"]
+    source_type: Literal["mes", "alarm", "quality", "maintenance", "knowledge", "analytics"]
     title: str
     excerpt: str
     source_ref: str

@@ -48,6 +48,14 @@ CREATE TABLE IF NOT EXISTS batches (
     material_lot TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS process_metrics (
+    batch_id TEXT PRIMARY KEY,
+    laser_power_percent REAL NOT NULL,
+    temperature_c REAL NOT NULL,
+    recorded_at TEXT NOT NULL,
+    FOREIGN KEY(batch_id) REFERENCES batches(id)
+);
+
 CREATE TABLE IF NOT EXISTS inspections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id TEXT NOT NULL,
@@ -172,6 +180,35 @@ class Database:
             count = connection.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
             if count == 0:
                 self._seed(connection)
+            self._ensure_process_metrics(connection)
+
+    def _ensure_process_metrics(self, connection: Any) -> None:
+        """Backfill deterministic process parameters for fresh and existing demo data."""
+        cursor = connection.execute(
+            "SELECT id,started_at,produced_qty,good_qty FROM batches ORDER BY started_at"
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        metrics = []
+        for row in rows:
+            produced = int(row["produced_qty"])
+            defect_rate = 100.0 * (produced - int(row["good_qty"])) / produced
+            batch_number = int(str(row["id"]).split("-")[-1])
+            jitter = ((batch_number % 7) - 3) * 0.08
+            laser_power = max(68.0, min(100.0, 101.2 - defect_rate * 3.0 + jitter))
+            temperature = 38.5 + defect_rate * 1.65 + jitter
+            metrics.append(
+                (
+                    row["id"],
+                    round(laser_power, 2),
+                    round(temperature, 2),
+                    row["started_at"],
+                )
+            )
+        connection.executemany(
+            "INSERT OR IGNORE INTO process_metrics(batch_id,laser_power_percent,temperature_c,recorded_at) VALUES (?,?,?,?)",
+            metrics,
+        )
 
     def _seed(self, connection: sqlite3.Connection) -> None:
         rng = random.Random(20250825)

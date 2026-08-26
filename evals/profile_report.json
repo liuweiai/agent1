@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-08-25T17:04:31.037214+00:00",
+  "model": "deepseek-v4-flash",
+  "profiles": [
+    {
+      "version": "DeepSeek + RAG",
+      "status": "completed",
+      "sample_size": 3,
+      "complete_task_success_rate": 1.0,
+      "grounded_hypothesis_rate": 1.0,
+      "tool_selection_accuracy": 1.0,
+      "model_success_rate": 0.6666666666666666,
+      "p95_response_time_ms": 62095,
+      "average_tokens": 4306,
+      "average_cost_usd": null,
+      "cost_note": "未配置供应商单价，不填造成本。"
+    },
+    {
+      "version": "DeepSeek + RAG + Rerank",
+      "status": "completed",
+      "sample_size": 3,
+      "complete_task_success_rate": 1.0,
+      "grounded_hypothesis_rate": 1.0,
+      "tool_selection_accuracy": 1.0,
+      "model_success_rate": 0.3333333333333333,
+      "p95_response_time_ms": 62411,
+      "average_tokens": 2137,
+      "average_cost_usd": null,
+      "cost_note": "未配置供应商单价，不填造成本。"
+    }
+  ]
+}

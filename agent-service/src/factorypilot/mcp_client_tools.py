@@ -65,7 +65,7 @@ class RemoteMesTools:
         return self.caller.call("get_line_device", {"run_id": run_id, "line_id": line_id})
     def get_recent_alerts(self, run_id: str, device_id: str, hours: int = 24, limit: int = 20):
         return self.caller.call("get_recent_alerts", {"run_id": run_id, "device_id": device_id, "hours": hours, "limit": limit})
-    def get_recent_quality(self, run_id: str, line_id: str, limit: int = 12):
+    def get_recent_quality(self, run_id: str, line_id: str, limit: int = 20):
         return self.caller.call("get_recent_quality", {"run_id": run_id, "line_id": line_id, "limit": limit})
     def get_maintenance_history(self, run_id: str, device_id: str, limit: int = 10):
         return self.caller.call("get_maintenance_history", {"run_id": run_id, "device_id": device_id, "limit": limit})

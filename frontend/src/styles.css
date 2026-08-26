@@ -115,6 +115,11 @@ button, textarea, input { font-family: inherit; }
 .evidence-card p { color: #8296ad; font-size: 12px; line-height: 1.65; }
 .score { color: #39d3a7 !important; font-family: ui-monospace, Consolas, monospace; }
 .source-ref { color: #4f9dd3 !important; font-size: 11px; font-family: ui-monospace, Consolas, monospace; }
+.analytics-card .ant-statistic-title { min-height: 34px; }
+.analytics-card .ant-statistic-content { color: #dce8f6; font-size: 22px; }
+.correlation-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.correlation-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #1b3048; border-radius: 9px; background: #0d1c2e; }
+.analytics-alert { margin-top: 14px; background: rgba(13, 34, 51, .72); border-color: #23425e; }
 .report-card .ant-descriptions-item-label { color: #6f839b; }
 .report-card .ant-descriptions-item-content { color: #d8e4f2; }
 .report-card .ant-divider { border-color: #20344b; }
@@ -141,4 +146,5 @@ button, textarea, input { font-family: inherit; }
   .query-box .ant-btn { height: 44px; }
   .incident-meta { flex-wrap: wrap; }
   .command-panel h2.ant-typography { font-size: 24px; }
+  .correlation-grid { grid-template-columns: 1fr; }
 }

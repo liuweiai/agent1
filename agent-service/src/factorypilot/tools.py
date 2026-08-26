@@ -77,7 +77,7 @@ class MesReadTools:
         )
 
     def get_recent_quality(
-        self, run_id: str, line_id: str, limit: int = 12
+        self, run_id: str, line_id: str, limit: int = 20
     ) -> list[dict[str, Any]]:
         self._validate_line(line_id)
         if not 3 <= limit <= 30:
@@ -90,8 +90,10 @@ class MesReadTools:
                 """
                 SELECT b.id AS batch_id,b.started_at,b.produced_qty,b.good_qty,
                        ROUND(100.0*b.good_qty/b.produced_qty,2) AS yield_rate,
-                       b.marking_speed,b.material_lot,i.defect_type,i.defect_qty
+                       b.marking_speed,b.material_lot,i.defect_type,i.defect_qty,
+                       pm.laser_power_percent,pm.temperature_c
                 FROM batches b JOIN inspections i ON i.batch_id=b.id
+                LEFT JOIN process_metrics pm ON pm.batch_id=b.id
                 WHERE b.line_id=? ORDER BY b.started_at DESC LIMIT ?
                 """,
                 (line_id, limit),
@@ -237,6 +239,26 @@ class SafeActionTools:
             "approval_id": approval.get("approval_id"),
         }
         started = time.perf_counter()
+        existing = self.database.fetch_one(
+            "SELECT id,status FROM work_orders WHERE run_id=? AND device_id=? ORDER BY created_at LIMIT 1",
+            (run_id, device_id),
+        )
+        if existing:
+            self.database.audit(
+                run_id,
+                approval["approver"],
+                "action-mcp",
+                "create_maintenance_order",
+                parameters,
+                "idempotent_replay",
+                int((time.perf_counter() - started) * 1000),
+            )
+            return {
+                "work_order_id": existing["id"],
+                "status": existing["status"],
+                "idempotent": True,
+                **parameters,
+            }
         order_id = f"WO-{uuid.uuid4().hex[:8].upper()}"
         self.database.execute(
             "INSERT INTO work_orders VALUES (?,?,?,?,?,?,?,?)",
@@ -251,7 +273,7 @@ class SafeActionTools:
             "success",
             int((time.perf_counter() - started) * 1000),
         )
-        return {"work_order_id": order_id, "status": "created", **parameters}
+        return {"work_order_id": order_id, "status": "created", "idempotent": False, **parameters}
 
     def tighten_inspection(
         self,
@@ -270,6 +292,28 @@ class SafeActionTools:
             "SELECT inspection_interval_minutes FROM line_controls WHERE line_id=?", (line_id,)
         )
         started = time.perf_counter()
+        existing = self.database.fetch_one(
+            "SELECT id FROM audit_logs WHERE run_id=? AND tool='action-mcp' "
+            "AND operation='tighten_inspection' AND outcome='success' ORDER BY id LIMIT 1",
+            (run_id,),
+        )
+        if existing:
+            parameters = {
+                "line_id": line_id,
+                "before": before["inspection_interval_minutes"] if before else None,
+                "after": before["inspection_interval_minutes"] if before else None,
+                "approval_id": approval.get("approval_id"),
+            }
+            self.database.audit(
+                run_id,
+                approval["approver"],
+                "action-mcp",
+                "tighten_inspection",
+                parameters,
+                "idempotent_replay",
+                int((time.perf_counter() - started) * 1000),
+            )
+            return {"status": "unchanged", "idempotent": True, **parameters}
         self.database.execute(
             "UPDATE line_controls SET inspection_interval_minutes=?,updated_at=? WHERE line_id=?",
             (interval_minutes, datetime.now(timezone.utc).isoformat(), line_id),
@@ -289,4 +333,4 @@ class SafeActionTools:
             "success",
             int((time.perf_counter() - started) * 1000),
         )
-        return {"status": "updated", **parameters}
+        return {"status": "updated", "idempotent": False, **parameters}

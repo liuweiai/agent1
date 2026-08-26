@@ -10,8 +10,10 @@ from mcp import Client
 from pydantic import SecretStr
 
 from factorypilot.mcp_servers.mes_server import mcp as mes_mcp
+from factorypilot.database import Database
 from factorypilot.milvus_knowledge import HashEmbeddingProvider, HybridReranker
 from factorypilot.mysql_database import MySQLConnectionAdapter, MySQLDatabase
+from factorypilot.tools import SafeActionTools
 
 
 def test_openai_compatible_engine_forwards_deepseek_configuration(monkeypatch) -> None:
@@ -120,3 +122,35 @@ def test_mysql_adapter_preserves_parameterization_and_ignore_semantics() -> None
 def test_mysql_decimal_values_are_normalized_for_mcp_json() -> None:
     row = MySQLDatabase._normalize_row({"yield_rate": Decimal("91.50"), "count": 3})
     assert row == {"yield_rate": 91.5, "count": 3}
+
+
+def test_write_tools_are_idempotent_per_run(tmp_path) -> None:
+    database = Database(tmp_path / "idempotency.db")
+    database.initialize()
+    database.create_run("RUN-IDEMPOTENT", "激光打码良率下降", "LINE-02")
+    tools = SafeActionTools(database)
+    approval = {
+        "approved": True,
+        "approver": "supervisor",
+        "approval_id": "APR-IDEMPOTENT",
+    }
+
+    first = tools.create_maintenance_order(
+        "RUN-IDEMPOTENT", "DEV-L02-LASER", "P1", "检查激光光路",
+        "检查镜片污染、功率反馈与冷却状态。", approval,
+    )
+    replay = tools.create_maintenance_order(
+        "RUN-IDEMPOTENT", "DEV-L02-LASER", "P1", "检查激光光路",
+        "检查镜片污染、功率反馈与冷却状态。", approval,
+    )
+    first_control = tools.tighten_inspection("RUN-IDEMPOTENT", "LINE-02", 10, approval)
+    replay_control = tools.tighten_inspection("RUN-IDEMPOTENT", "LINE-02", 10, approval)
+
+    assert first["idempotent"] is False
+    assert replay["idempotent"] is True
+    assert replay["work_order_id"] == first["work_order_id"]
+    assert first_control["idempotent"] is False
+    assert replay_control["idempotent"] is True
+    assert database.fetch_one(
+        "SELECT COUNT(*) AS count FROM work_orders WHERE run_id=?", ("RUN-IDEMPOTENT",)
+    )["count"] == 1

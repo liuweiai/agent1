@@ -7,6 +7,7 @@ FactoryPilot 是一个面向 MES 场景的“生产异常诊断与闭环处置 A
 ## 已实现能力
 
 - LangGraph 并行证据收集、根因分析、风险计划、`interrupt` 审批、执行、验证和事故报告。
+- LLM 前置确定性统计节点：计算最近 20 批次趋势、异常前后均值、工艺参数与缺陷率 Pearson 相关性、告警时间重合及连续三批恢复条件；统计结果作为 RCA 证据而非让模型直接猜测。
 - SQLite 本地模式与 MySQL 8 生产化数据模式；所有查询参数化，Agent 没有任意 SQL 执行能力。
 - 10 台设备、1000+ 告警、500 个批次、100+ 维修记录、30 份手册/SOP。
 - Milvus 向量检索与关键词分数融合重排，结果包含文档、章节、版本和分数；故障时可配置降级到本地检索。
@@ -15,8 +16,8 @@ FactoryPilot 是一个面向 MES 场景的“生产异常诊断与闭环处置 A
 - Spring Boot WebFlux 网关、JWT HttpOnly Cookie、RBAC；只有 `SUPERVISOR`/`ADMIN` 可审批。
 - 网关向 Agent Service 注入共享密钥，生产模式禁止绕过网关直接访问业务 API。
 - SQLite checkpoint 持久化；服务重启后可按同一 `thread_id` 恢复人工审批任务。
-- React + TypeScript 操作台展示执行时间线、良率、证据链、审批方案与报告。
-- pytest、MCP 协议测试、Spring Security 集成测试、前端构建、30 条本地回归集和 LangSmith 在线评测入口。
+- React + TypeScript 操作台展示执行时间线、20 批趋势、统计证据、相关性、证据链、审批方案与报告。
+- pytest、MCP 协议测试、Spring Security 集成测试、前端构建、80 条本地回归集、真实 DeepSeek 配置对比与 LangSmith 在线评测入口。
 
 ## 架构与工作流
 
@@ -36,8 +37,9 @@ flowchart TD
     T --> A[设备告警]
     T --> H[维修记录]
     T --> K[Milvus SOP 检索]
-    M --> R[RCAAgent]
-    A --> R
+    M --> S[确定性统计分析]
+    A --> S
+    S --> R[RCAAgent]
     H --> R
     K --> R
     R --> C[证据与置信度检查]
@@ -160,7 +162,18 @@ cd ..\mes-gateway
 mvn test
 ```
 
-本地评测报告见 [evals/report.md](evals/report.md)。数据为确定性合成数据，报告中的高分只用于验证工作流回归，不能代表真实工厂数据上的模型泛化能力。
+综合评测报告见 [evals/report.md](evals/report.md)，原始在线结果见 [evals/profile_report.json](evals/profile_report.json) 与 [evals/langsmith_report.json](evals/langsmith_report.json)。数据为确定性合成数据，报告中的高分只用于验证工作流回归，不能代表真实工厂数据上的模型泛化能力。
+
+当前回归集共 80 条：30 条意图、25 条检索和 25 条困难/安全场景。困难场景包含信息不足、证据冲突、MCP 超时/空结果、模型非法 JSON、Prompt Injection、越权写入、重复审批/执行、无告警良率下降、多设备输入和 SQL 注入标识符。报告会保留失败案例；`profile_report.json` 不存在时，在线模型行显示 `not_run`，不会使用假造数据补表。
+
+使用已配置的真实 DeepSeek Key 对比词法 RAG 与 Milvus 融合重排：
+
+```powershell
+.\.venv\Scripts\python.exe evals\profile_benchmark.py
+.\.venv\Scripts\python.exe evals\evaluate.py
+```
+
+在线配置仅运行小样本冒烟对比并记录完整任务成功率、有据可依率、工具准确率、P95 和 Token；未配置供应商单价时成本保持为空。正式简历数据应增加运行次数和固定模型版本后再引用。
 
 LangSmith 在线数据集与回归实验：
 
@@ -172,7 +185,7 @@ $env:LANGSMITH_PROJECT = "factorypilot"
 .\.venv\Scripts\python.exe evals\langsmith_eval.py
 ```
 
-脚本会同步 `factorypilot-regression-v1` 数据集并运行意图准确率、`Recall@4` 和引用完整性评测。没有 Key 时可继续使用完全离线的 `evals/evaluate.py`。
+脚本会把 55 条无副作用的意图/检索样本同步到 `factorypilot-regression-v1`，并运行意图准确率、`Recall@4` 和引用完整性评测；需要隔离数据库和故障注入的 25 条安全场景由本地 `evals/evaluate.py` 运行。没有 Key 时仍可使用完整离线评测。
 
 ## 可选真实 LLM
 

@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-08-26T01:39:30.351470+00:00",
+  "dataset": "factorypilot-regression-v1",
+  "experiment": "factorypilot-regression-cd6e1a5e",
+  "experiment_url": "https://apac.smith.langchain.com/o/2a99a337-3835-4ceb-8215-178a9b1b24d0/datasets/adde56ef-afa6-4f79-98e6-6f1e3b1e5157/compare?selectedSessions=ce0ad283-99f3-411f-a6a1-9994d6ff81c4",
+  "run_count": 55,
+  "ingestion_complete": true,
+  "scores": {
+    "citation_present": {
+      "count": 55,
+      "mean": 0.9636
+    },
+    "recall_at_4": {
+      "count": 25,
+      "mean": 0.92
+    },
+    "intent_accuracy": {
+      "count": 30,
+      "mean": 1.0
+    }
+  },
+  "scope": "55条无副作用意图/检索样本；25条故障注入与写安全场景在本地隔离运行。"
+}
