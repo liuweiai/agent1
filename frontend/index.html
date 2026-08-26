@@ -8,6 +8,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script type="module">
+      if (location.hash.includes('figmacapture=')) {
+        const capture = document.createElement('script')
+        capture.src = 'https://mcp.figma.com/mcp/html-to-design/capture.js'
+        capture.async = true
+        document.head.appendChild(capture)
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

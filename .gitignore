@@ -12,3 +12,6 @@ dist/
 target/
 .idea/
 .vscode/
+frontend/.qa-edge-profile/
+frontend/ui-*.png
+frontend/qa-*.html
