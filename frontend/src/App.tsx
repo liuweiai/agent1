@@ -259,20 +259,52 @@ function App() {
 
   return (
     <Layout className="app-shell">
-      <Header className="app-header">
+      <aside className="app-sidebar">
         <div className="brand">
           <div className="brand-mark"><ThunderboltFilled /></div>
           <div>
             <div className="brand-name">FactoryPilot</div>
-            <div className="brand-caption">MES 异常诊断与闭环处置中心</div>
+            <div className="brand-caption">MES 异常闭环控制台</div>
           </div>
         </div>
-        <Space size="large">
+
+        <div className="sidebar-section-label">工作台</div>
+        <nav className="sidebar-nav" aria-label="主要导航">
+          <button type="button" className="sidebar-nav-item active"><RobotOutlined /><span>异常控制台</span></button>
+          <button type="button" className="sidebar-nav-item"><ClockCircleOutlined /><span>异常任务</span><span className="nav-count">{history.length}</span></button>
+          <button type="button" className="sidebar-nav-item"><AuditOutlined /><span>评测中心</span></button>
+          <button type="button" className="sidebar-nav-item"><SafetyCertificateOutlined /><span>审计日志</span></button>
+        </nav>
+
+        <div className="sidebar-section-label">运行环境</div>
+        <div className="environment-card">
+          <div><span className="environment-dot" />SIMULATION</div>
+          <span>MySQL · Milvus · MCP</span>
+          <span>LangGraph checkpoint 已启用</span>
+        </div>
+
+        <div className="sidebar-spacer" />
+        {user && (
+          <div className="sidebar-operator">
+            <div className="operator-avatar"><UserOutlined /></div>
+            <div>
+              <strong>{user.display_name}</strong>
+              <span>{user.roles.includes('SUPERVISOR') ? 'SUPERVISOR' : 'OPERATOR'}</span>
+            </div>
+          </div>
+        )}
+      </aside>
+
+      <Layout className="app-workspace">
+      <Header className="app-header">
+        <div className="header-context">
+          <span>生产运营 / 异常处置</span>
+          <strong>异常诊断指挥台</strong>
+        </div>
+        <Space size="middle" className="header-actions">
           <Badge status="processing" text={<span className="muted">Agent Service 在线</span>} />
           {user && (
             <Space className="identity">
-              <UserOutlined />
-              <span>{user.display_name}</span>
               <Tag>{user.roles.includes('SUPERVISOR') ? '主管' : '操作员'}</Tag>
               <Button type="text" size="small" icon={<LogoutOutlined />} onClick={logout} />
             </Space>
@@ -283,25 +315,31 @@ function App() {
 
       <Content className="app-content">
         <section className="command-panel">
-          <div>
+          <div className="command-intro">
             <Text className="eyebrow">INCIDENT COMMAND</Text>
-            <Title level={2}>今天要诊断哪一个生产异常？</Title>
-            <Paragraph className="lead">输入自然语言问题，系统会查询生产、设备、质量与知识数据，并在任何写操作前暂停审批。</Paragraph>
+            <Title level={2}>用证据驱动生产异常闭环</Title>
+            <Paragraph className="lead">Agent 查询生产、设备、质量与知识数据；确定性程序先计算统计证据，高风险写操作必须经过人工审批。</Paragraph>
+            <Space size={8} wrap className="scope-tags">
+              <Tag>LINE-02</Tag><Tag>激光打码</Tag><Tag>质量异常</Tag>
+            </Space>
           </div>
           <div className="query-box">
-            <TextArea value={query} onChange={(event) => setQuery(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={500} />
+            <div className="query-field">
+              <span className="query-label">输入异常描述</span>
+              <TextArea value={query} onChange={(event) => setQuery(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={500} />
+            </div>
             <Button type="primary" size="large" icon={<PlayCircleFilled />} loading={creating} onClick={startDiagnosis}>
               启动诊断
             </Button>
           </div>
         </section>
 
-        <Row gutter={[20, 20]}>
-          <Col xs={24} xl={6}>
+        <Row gutter={[16, 16]} className="workspace-row">
+          <Col xs={24} lg={6}>
             <Card className="surface history-card" bordered={false}>
               <div className="section-heading">
                 <div><ClockCircleOutlined /> 最近任务</div>
-                <Text type="secondary">{history.length} 条</Text>
+                <Text type="secondary">{history.length} 条 · 实时</Text>
               </div>
               <List
                 dataSource={history}
@@ -320,13 +358,19 @@ function App() {
             </Card>
           </Col>
 
-          <Col xs={24} xl={18}>
+          <Col xs={24} lg={18}>
             <Spin spinning={loading}>
               {!run ? (
                 <Card className="surface empty-stage" bordered={false}>
-                  <RobotOutlined />
-                  <Title level={3}>等待异常输入</Title>
-                  <Text type="secondary">上方示例已经准备好，点击“启动诊断”即可观看完整工作流。</Text>
+                  <div className="empty-visual"><RobotOutlined /></div>
+                  <Text className="eyebrow">READY FOR INCIDENT</Text>
+                  <Title level={3}>选择历史任务，或发起一次新诊断</Title>
+                  <Text type="secondary">示例数据已经准备好，启动后可观看从分析、审批到验证的完整闭环。</Text>
+                  <div className="capability-grid">
+                    <div><DatabaseOutlined /><strong>多源数据</strong><span>MES / 告警 / 质量</span></div>
+                    <div><FileSearchOutlined /><strong>证据检索</strong><span>手册 / SOP / 维修记录</span></div>
+                    <div><SafetyCertificateOutlined /><strong>安全执行</strong><span>RBAC / 审批 / 审计</span></div>
+                  </div>
                 </Card>
               ) : (
                 <Space direction="vertical" size={20} style={{ width: '100%' }}>
@@ -360,9 +404,32 @@ function App() {
                     )}
                   </Card>
 
+                  <div className="metric-strip">
+                    <div className="metric-card danger">
+                      <span>当前良率</span>
+                      <strong>{productionAnalysis?.anomaly.average_yield ?? run.state.quality?.[0]?.yield_rate ?? '--'}%</strong>
+                      <small>{productionAnalysis?.yield_change_pp != null ? `${productionAnalysis.yield_change_pp.toFixed(2)} pp` : '等待质量数据'}</small>
+                    </div>
+                    <div className="metric-card warning">
+                      <span>风险等级</span>
+                      <strong>{run.severity ?? '--'}</strong>
+                      <small>{run.status === 'awaiting_approval' ? '需要人工审批' : STATUS[run.status].text}</small>
+                    </div>
+                    <div className="metric-card success">
+                      <span>证据覆盖</span>
+                      <strong>{evidence.length} 条</strong>
+                      <small>{new Set(evidence.map((item) => item.source_type)).size} 类数据源</small>
+                    </div>
+                    <div className="metric-card info">
+                      <span>工作流进度</span>
+                      <strong>{run.events.filter((event) => event.status === 'completed').length} / {run.events.length}</strong>
+                      <small>{run.events.some((event) => event.status === 'running') ? 'Agent 正在执行' : STATUS[run.status].text}</small>
+                    </div>
+                  </div>
+
                   <Row gutter={[20, 20]}>
                     <Col xs={24} lg={10}>
-                      <Card className="surface timeline-card" bordered={false} title={<span><RobotOutlined /> Agent 执行时间线</span>}>
+                      <Card className="surface timeline-card" bordered={false} title={<span><RobotOutlined /> Agent 执行工作流</span>} extra={<Text type="secondary">实时审计</Text>}>
                         <Timeline>
                           {run.events.map((event) => (
                             <Timeline.Item color={EVENT_COLOR[event.status]} key={event.id}>
@@ -379,7 +446,7 @@ function App() {
                     </Col>
                     <Col xs={24} lg={14}>
                       <Space direction="vertical" size={20} style={{ width: '100%' }}>
-                        <Card className="surface" bordered={false} title="最近20批次良率趋势与验证窗口">
+                        <Card className="surface chart-card" bordered={false} title="最近20批次良率趋势与验证窗口" extra={<Tag color="cyan">DETERMINISTIC</Tag>}>
                           {(run.state.quality?.length ?? 0) > 0 ? <ReactECharts option={chartOption} style={{ height: 280 }} /> : <Empty description="等待质量数据" />}
                           {run.state.verification && <Alert type="info" showIcon message={run.state.verification.note} />}
                         </Card>
@@ -533,6 +600,7 @@ function App() {
         <label className="field-label">密码</label>
         <Input.Password value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} onPressEnter={login} />
       </Modal>
+      </Layout>
     </Layout>
   )
 }

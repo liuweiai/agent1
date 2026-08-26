@@ -3,3 +3,6 @@ dist/
 .vite/
 npm-debug.log*
 .env*
+.qa-edge-profile/
+ui-*.png
+qa-*.html
