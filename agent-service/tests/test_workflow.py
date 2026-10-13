@@ -108,3 +108,30 @@ def test_health_endpoint(monkeypatch) -> None:
             assert response.json()["tools"] == "inprocess"
     finally:
         get_settings.cache_clear()
+
+
+def test_audit_log_repository_returns_parsed_parameters(tmp_path: Path) -> None:
+    settings = Settings(
+        database_path=tmp_path / "mes.db",
+        checkpoint_path=tmp_path / "checkpoints.db",
+        agent_mode="demo",
+    )
+    service = AgentService(settings)
+    try:
+        service.database.audit(
+            run_id="run-audit-test",
+            actor="DataAgent",
+            tool="mes-mcp",
+            operation="get_recent_quality",
+            parameters={"line_id": "LINE-02", "limit": 20},
+            outcome="success",
+            duration_ms=18,
+        )
+
+        rows = service.database.list_audit_logs(limit=10, run_id="run-audit-test")
+
+        assert len(rows) == 1
+        assert rows[0]["parameters"] == {"line_id": "LINE-02", "limit": 20}
+        assert "parameters_json" not in rows[0]
+    finally:
+        service.close()

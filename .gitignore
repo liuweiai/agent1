@@ -13,5 +13,12 @@ target/
 .idea/
 .vscode/
 frontend/.qa-edge-profile/
+frontend/.visual-qa-profile/
 frontend/ui-*.png
 frontend/qa-*.html
+
+# Local verification output and document-rendering intermediates
+.test-tmp/
+.docx-*-qa*/
+.docx-qa*/
+~$*.docx

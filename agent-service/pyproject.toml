@@ -18,6 +18,9 @@ dependencies = [
   "pymysql>=1.1,<2",
   "pymilvus>=2.6,<3",
   "langsmith>=0.4,<1",
+  "redis>=5.2,<7",
+  "celery>=5.5,<6",
+  "neo4j>=5.28,<7",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +40,8 @@ where = ["src"]
 factorypilot-mes-mcp = "factorypilot.mcp_servers.mes_server:main"
 factorypilot-knowledge-mcp = "factorypilot.mcp_servers.knowledge_server:main"
 factorypilot-action-mcp = "factorypilot.mcp_servers.action_server:main"
+factorypilot-vendor-a2a = "factorypilot.a2a.vendor_server:main"
+factorypilot-worker = "factorypilot.task_queue:worker_main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

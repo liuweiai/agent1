@@ -11,12 +11,15 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
 from .analysis_engine import DemoRcaEngine, OpenAIRcaEngine
+from .a2a.client import create_vendor_expert_client
 from .config import Settings
+from .coordination import RedisCoordinator, RunLease
 from .graph import FactoryPilotGraph
 from .mcp_client_tools import create_remote_tools
 from .milvus_knowledge import create_knowledge_tools
 from .models import ApprovalRequest, RunCreate
 from .mysql_database import create_database
+from .neo4j_knowledge import create_graph_knowledge_tools
 from .tools import KnowledgeTools, MesReadTools, SafeActionTools
 
 
@@ -36,6 +39,8 @@ class AgentService:
         self.settings.ensure_directories()
         self.database = create_database(settings)
         self.database.initialize()
+        self.coordinator = RedisCoordinator(settings)
+        self.database.set_event_sink(self.coordinator.publish_run_signal)
         self._checkpoint_connection = sqlite3.connect(
             str(settings.checkpoint_path), check_same_thread=False
         )
@@ -58,14 +63,25 @@ class AgentService:
             mes_tools = MesReadTools(self.database)
             knowledge_tools = create_knowledge_tools(self.database, settings)
             action_tools = SafeActionTools(self.database)
+        self.graph_knowledge = create_graph_knowledge_tools(self.database, settings)
+        self.vendor_expert = create_vendor_expert_client(self.database, settings)
         factory = FactoryPilotGraph(
-            self.database, mes_tools, knowledge_tools, action_tools, rca_engine
+            self.database,
+            mes_tools,
+            knowledge_tools,
+            action_tools,
+            rca_engine,
+            self.graph_knowledge,
+            self.vendor_expert,
         )
         self.graph = factory.build(self.checkpointer)
         self._running: set[str] = set()
+        self._leases: dict[str, RunLease] = {}
         self._lock = threading.Lock()
 
     def close(self) -> None:
+        self.graph_knowledge.close()
+        self.coordinator.close()
         self._checkpoint_connection.close()
 
     @staticmethod
@@ -85,12 +101,14 @@ class AgentService:
         )
         return self.database.get_run(run_id) or {}
 
-    def start_run(self, run_id: str) -> None:
+    def start_run(self, run_id: str, propagate_transient: bool = False) -> None:
         if not self._claim(run_id):
             return
         try:
             run = self.database.get_run(run_id)
             if not run:
+                return
+            if run["status"] not in {"queued", "running"}:
                 return
             initial = {
                 "run_id": run_id,
@@ -98,9 +116,23 @@ class AgentService:
                 "line_id": run["line_id"],
                 "evidence": [],
             }
-            self.graph.invoke(initial, config=self.config(run_id))
+            snapshot = self.graph.get_state(self.config(run_id))
+            if snapshot.values and snapshot.next:
+                self.graph.invoke(None, config=self.config(run_id))
+            elif not snapshot.values:
+                self.graph.invoke(initial, config=self.config(run_id))
             self._save_graph_state(run_id)
         except Exception as exc:
+            if propagate_transient:
+                self.database.emit_event(
+                    run_id,
+                    "queue_retry",
+                    "分布式任务等待重试",
+                    "waiting",
+                    f"{type(exc).__name__}: 工作进程将按退避策略重试",
+                    idempotency_key=f"queue_retry:{type(exc).__name__}",
+                )
+                raise
             self._mark_failed(run_id, exc)
         finally:
             self._release(run_id)
@@ -121,10 +153,18 @@ class AgentService:
         self.database.update_run(run_id, status="executing" if request.approved else "running")
         return approval
 
-    def resume_run(self, run_id: str, approval: dict[str, Any]) -> None:
+    def resume_run(
+        self,
+        run_id: str,
+        approval: dict[str, Any],
+        propagate_transient: bool = False,
+    ) -> None:
         if not self._claim(run_id):
             return
         try:
+            run = self.database.get_run(run_id)
+            if not run or run["status"] not in {"executing", "running"}:
+                return
             self.database.emit_event(
                 run_id,
                 "approval_decision",
@@ -142,22 +182,45 @@ class AgentService:
                 "approved" if approval["approved"] else "rejected",
                 0,
             )
+            snapshot = self.graph.get_state(self.config(run_id))
+            if snapshot.values and not snapshot.next:
+                self._finalize_run(run_id, approval)
+                return
             self.graph.invoke(Command(resume=approval), config=self.config(run_id))
-            self._save_graph_state(run_id)
-            # Publish the terminal status only after the final graph state is durable.
-            # SSE clients can therefore never observe a completed run with stale state.
-            self.database.update_run(
-                run_id, status="completed" if approval["approved"] else "rejected"
-            )
+            self._finalize_run(run_id, approval)
         except Exception as exc:
+            if propagate_transient:
+                self.database.emit_event(
+                    run_id,
+                    "queue_resume_retry",
+                    "审批恢复任务等待重试",
+                    "waiting",
+                    f"{type(exc).__name__}: 工作进程将按退避策略重试",
+                    idempotency_key=f"queue_resume_retry:{type(exc).__name__}",
+                )
+                raise
             self._mark_failed(run_id, exc)
         finally:
             self._release(run_id)
 
-    def _save_graph_state(self, run_id: str) -> None:
+    def _finalize_run(self, run_id: str, approval: dict[str, Any]) -> None:
+        # Persist the final state/report before exposing a terminal status to SSE.
+        state = self._save_graph_state(run_id)
+        verification = state.get("verification", {})
+        if not approval["approved"]:
+            status, error = "rejected", None
+        elif verification.get("write_state_verified") is not True:
+            status = "failed"
+            error = verification.get("note", "缺少写入验证结果，需人工核查。")
+        else:
+            status, error = "completed", None
+        self.database.update_run(run_id, status=status, error=error)
+
+    def _save_graph_state(self, run_id: str) -> dict[str, Any]:
         snapshot = self.graph.get_state(self.config(run_id))
         serialized = json.dumps(snapshot.values, ensure_ascii=False, default=_json_default)
         self.database.update_run(run_id, state_json=serialized)
+        return dict(snapshot.values)
 
     def _mark_failed(self, run_id: str, exc: Exception) -> None:
         self.database.update_run(run_id, status="failed", error=f"{type(exc).__name__}: {exc}")
@@ -170,13 +233,23 @@ class AgentService:
             idempotency_key=f"error:{type(exc).__name__}",
         )
 
+    def mark_queue_failed(self, run_id: str, exc: Exception) -> None:
+        self._mark_failed(run_id, exc)
+
     def _claim(self, run_id: str) -> bool:
         with self._lock:
             if run_id in self._running:
                 return False
+            if self.coordinator.available:
+                lease = self.coordinator.acquire_run_lock(run_id)
+                if not lease:
+                    return False
+                self._leases[run_id] = lease
             self._running.add(run_id)
             return True
 
     def _release(self, run_id: str) -> None:
         with self._lock:
             self._running.discard(run_id)
+            lease = self._leases.pop(run_id, None)
+        self.coordinator.release_run_lock(lease)

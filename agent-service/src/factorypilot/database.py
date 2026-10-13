@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from .models import TimelineEvent, utc_now
 
@@ -157,7 +157,13 @@ class Database:
 
     def __init__(self, path: Path | str):
         self.path = str(path)
+        self.event_sink: Callable[[dict[str, Any]], None] | None = None
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+
+    def set_event_sink(
+        self, event_sink: Callable[[dict[str, Any]], None] | None
+    ) -> None:
+        self.event_sink = event_sink
 
     def connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
@@ -431,14 +437,31 @@ class Database:
         idempotency_key: str | None = None,
     ) -> None:
         key = idempotency_key or f"{step}:{status}"
+        event_payload = payload or {}
+        created_at = utc_now()
+        inserted = False
         with self.session() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT OR IGNORE INTO run_events(
                     run_id,step,title,status,detail,payload_json,idempotency_key,created_at
                 ) VALUES (?,?,?,?,?,?,?,?)
                 """,
-                (run_id, step, title, status, detail, json.dumps(payload or {}, ensure_ascii=False), key, utc_now()),
+                (run_id, step, title, status, detail, json.dumps(event_payload, ensure_ascii=False), key, created_at),
+            )
+            inserted = cursor.rowcount > 0
+            cursor.close()
+        if inserted and self.event_sink:
+            self.event_sink(
+                {
+                    "run_id": run_id,
+                    "step": step,
+                    "title": title,
+                    "status": status,
+                    "detail": detail,
+                    "payload": event_payload,
+                    "created_at": created_at,
+                }
             )
 
     def get_events(self, run_id: str, after_id: int = 0) -> list[dict[str, Any]]:
@@ -468,6 +491,26 @@ class Database:
             "SELECT id,query,line_id,status,severity,risk_level,created_at,updated_at FROM runs ORDER BY created_at DESC LIMIT ?",
             (limit,),
         )
+
+    def list_audit_logs(
+        self, limit: int = 100, run_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        if run_id:
+            rows = self.fetch_all(
+                "SELECT * FROM audit_logs WHERE run_id=? ORDER BY id DESC LIMIT ?",
+                (run_id, limit),
+            )
+        else:
+            rows = self.fetch_all(
+                "SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (limit,)
+            )
+        for row in rows:
+            raw = row.pop("parameters_json", None)
+            if isinstance(raw, dict):
+                row["parameters"] = raw
+            else:
+                row["parameters"] = json.loads(raw or "{}")
+        return rows
 
     def audit(
         self,

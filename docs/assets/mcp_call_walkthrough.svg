@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1750" viewBox="0 0 1800 1750"><rect width="100%" height="100%" fill="white"/>
+<rect x="210" y="80" width="1380" height="155" rx="16" fill="#F1F5F9" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="131.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">collect_mes_data</text>
+<text x="900.0" y="183.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">self.mes.get_recent_quality(run_id, line_id, 20)</text>
+<rect x="210" y="315" width="1380" height="155" rx="16" fill="#EAF3F8" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="366.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">RemoteMesTools.get_recent_quality</text>
+<text x="900.0" y="418.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">caller.call(&quot;get_recent_quality&quot;, arguments)</text>
+<rect x="210" y="550" width="1380" height="155" rx="16" fill="#EAF3F8" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="601.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">MCPRemoteCaller</text>
+<text x="900.0" y="653.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">Streamable HTTP → client.call_tool(...)</text>
+<rect x="210" y="820" width="1380" height="155" rx="16" fill="#EAF3F8" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="871.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">mes_server.get_recent_quality</text>
+<text x="900.0" y="923.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">@mcp.tool() 注册的服务端函数</text>
+<rect x="210" y="1055" width="1380" height="155" rx="16" fill="#F1F5F9" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="1106.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">MesReadTools.get_recent_quality</text>
+<text x="900.0" y="1158.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">参数校验 → 固定 SELECT → finally 审计</text>
+<rect x="210" y="1290" width="1380" height="155" rx="16" fill="#F1F5F9" stroke="#486782" stroke-width="3"/>
+<text x="900.0" y="1341.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">MySQL 或 SQLite</text>
+<text x="900.0" y="1393.5" font-family="Microsoft YaHei, sans-serif" font-size="40" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">batches + inspections + process_metrics</text>
+<polyline points="900.0,235 900.0,315" fill="none" stroke="#486782" stroke-width="4"/>
+<polygon points="900.0,315 891.0,299.4115427318801 909.0,299.4115427318801" fill="#486782"/>
+<polyline points="900.0,470 900.0,550" fill="none" stroke="#486782" stroke-width="4"/>
+<polygon points="900.0,550 891.0,534.4115427318801 909.0,534.4115427318801" fill="#486782"/>
+<polyline points="900.0,705 900.0,820" fill="none" stroke="#486782" stroke-width="4"/>
+<polygon points="900.0,820 891.0,804.4115427318801 909.0,804.4115427318801" fill="#486782"/>
+<polyline points="900.0,975 900.0,1055" fill="none" stroke="#486782" stroke-width="4"/>
+<polygon points="900.0,1055 891.0,1039.4115427318802 909.0,1039.4115427318802" fill="#486782"/>
+<polyline points="900.0,1210 900.0,1290" fill="none" stroke="#486782" stroke-width="4"/>
+<polygon points="900.0,1290 891.0,1274.4115427318802 909.0,1274.4115427318802" fill="#486782"/>
+<text x="1140" y="767" font-family="Microsoft YaHei, sans-serif" font-size="34" font-weight="400" fill="#167D7A" text-anchor="middle" dominant-baseline="central">HTTP 进程边界</text>
+<text x="900" y="1540" font-family="Microsoft YaHei, sans-serif" font-size="42" font-weight="700" fill="#203449" text-anchor="middle" dominant-baseline="central">结果沿原路径返回 → quality → 统计分析 → RCA</text>
+<text x="900" y="1630" font-family="Microsoft YaHei, sans-serif" font-size="37" font-weight="400" fill="#203449" text-anchor="middle" dominant-baseline="central">inprocess 模式：Node 直接调用 MesReadTools，跳过中间三层</text>
+<text x="900" y="1700" font-family="Microsoft YaHei, sans-serif" font-size="34" font-weight="400" fill="#5E6A73" text-anchor="middle" dominant-baseline="central">日志中的 mes-mcp 标签本身不能证明发生了网络调用</text></svg>

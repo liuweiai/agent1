@@ -1,4 +1,4 @@
-import type { AuthUser, RunDetail, RunSummary } from './types'
+import type { AuditLog, AuthUser, EvaluationReport, RunDetail, RunSummary } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 
@@ -24,6 +24,16 @@ export const api = {
   me: () => request<AuthUser>('/api/auth/me'),
   logout: () => request<{ status: string }>('/api/auth/logout', { method: 'POST' }),
   listRuns: () => request<RunSummary[]>('/api/runs'),
+  listAuditLogs: (limit = 100, runId?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (runId) params.set('run_id', runId)
+    return request<AuditLog[]>(`/api/audit-logs?${params.toString()}`)
+  },
+  evaluationReport: async () => {
+    const response = await fetch('/evaluation-report.json', { cache: 'no-store' })
+    if (!response.ok) throw new Error('评测报告加载失败')
+    return response.json() as Promise<EvaluationReport>
+  },
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   createRun: (query: string, lineId = 'LINE-02') =>
     request<RunSummary>('/api/runs', {
@@ -35,5 +45,5 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ approved, approver, comment }),
     }),
-  eventUrl: (id: string) => `${API_BASE}/api/runs/${id}/events`,
+  eventUrl: (id: string, after = 0) => `${API_BASE}/api/runs/${id}/events?after=${after}`,
 }

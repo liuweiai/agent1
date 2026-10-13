@@ -18,6 +18,7 @@ import {
   Space,
   Spin,
   Statistic,
+  Table,
   Tag,
   Timeline,
   Typography,
@@ -36,11 +37,23 @@ import {
   WarningFilled,
   UserOutlined,
   LogoutOutlined,
+  LinkOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 
 import { api } from './api'
-import type { AuthUser, Evidence, RunDetail, RunStatus, RunSummary, TimelineEvent } from './types'
+import { cursorFromEvents, subscribeRunEvents } from './runEvents'
+import type {
+  AuditLog,
+  AuthUser,
+  EvaluationReport,
+  Evidence,
+  RunDetail,
+  RunStatus,
+  RunSummary,
+  TimelineEvent,
+} from './types'
 
 const { Header, Content } = Layout
 const { Text, Title, Paragraph } = Typography
@@ -48,6 +61,15 @@ const { TextArea } = Input
 
 const DEFAULT_QUERY = '2号产线激光打码设备良率从 98% 降到 91%，帮我分析原因并给出处置方案。'
 const AUTH_ENABLED = (import.meta.env.VITE_AUTH_ENABLED ?? 'true') === 'true'
+
+type WorkspaceView = 'console' | 'tasks' | 'evaluation' | 'audit'
+
+const VIEW_CONTEXT: Record<WorkspaceView, { breadcrumb: string; title: string }> = {
+  console: { breadcrumb: '生产运营 / 异常处置', title: '异常诊断' },
+  tasks: { breadcrumb: '生产运营 / 任务管理', title: '异常任务' },
+  evaluation: { breadcrumb: 'Agent 工程 / 质量保障', title: '评测中心' },
+  audit: { breadcrumb: '安全治理 / 工具调用', title: '审计日志' },
+}
 
 const STATUS: Record<RunStatus, { text: string; color: string }> = {
   queued: { text: '排队中', color: 'default' },
@@ -68,20 +90,22 @@ const EVENT_COLOR: Record<TimelineEvent['status'], string> = {
 }
 
 function App() {
+  const [activeView, setActiveView] = useState<WorkspaceView>('console')
   const [query, setQuery] = useState(DEFAULT_QUERY)
   const [run, setRun] = useState<RunDetail | null>(null)
   const [history, setHistory] = useState<RunSummary[]>([])
   const [creating, setCreating] = useState(false)
   const [loading, setLoading] = useState(false)
   const [approvalOpen, setApprovalOpen] = useState(false)
-  const [approver, setApprover] = useState('生产主管-张工')
+  const [approver, setApprover] = useState('生产主管-刘工')
   const [comment, setComment] = useState('批准模拟处置，执行后继续加严检验。')
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
   const [loginUsername, setLoginUsername] = useState('supervisor')
   const [loginPassword, setLoginPassword] = useState('supervisor123')
   const [loggingIn, setLoggingIn] = useState(false)
-  const eventSource = useRef<EventSource | null>(null)
+  const eventSource = useRef<{ close: () => void } | null>(null)
+  const selectedRun = useRef<string | null>(null)
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -93,26 +117,19 @@ function App() {
 
   const refreshRun = useCallback(async (id: string) => {
     const detail = await api.getRun(id)
-    setRun(detail)
+    if (selectedRun.current === id) setRun(detail)
     return detail
   }, [])
 
   const connectEvents = useCallback(
-    (id: string) => {
+    (id: string, initialCursor = 0) => {
       eventSource.current?.close()
-      const source = new EventSource(api.eventUrl(id), { withCredentials: true })
-      eventSource.current = source
-      source.addEventListener('timeline', () => {
-        refreshRun(id).catch(() => undefined)
+      eventSource.current = subscribeRunEvents(id, {
+        url: (after) => api.eventUrl(id, after),
+        initialCursor,
+        refresh: () => refreshRun(id),
+        onDone: () => { void refreshHistory() },
       })
-      source.addEventListener('done', () => {
-        refreshRun(id).catch(() => undefined)
-        refreshHistory()
-        source.close()
-      })
-      source.onerror = () => {
-        if (source.readyState === EventSource.CLOSED) return
-      }
     },
     [refreshHistory, refreshRun],
   )
@@ -147,6 +164,8 @@ function App() {
   }
 
   const logout = async () => {
+    eventSource.current?.close()
+    selectedRun.current = null
     await api.logout().catch(() => undefined)
     setUser(null)
     setRun(null)
@@ -158,9 +177,10 @@ function App() {
     setCreating(true)
     try {
       const created = await api.createRun(query.trim())
-      const detail = await api.getRun(created.id)
-      setRun(detail)
-      connectEvents(created.id)
+      eventSource.current?.close()
+      selectedRun.current = created.id
+      const detail = await refreshRun(created.id)
+      if (selectedRun.current === created.id) connectEvents(created.id, cursorFromEvents(detail.events))
       refreshHistory()
     } catch (error) {
       message.error(error instanceof Error ? error.message : '任务创建失败')
@@ -170,10 +190,15 @@ function App() {
   }
 
   const openRun = async (id: string) => {
+    eventSource.current?.close()
+    selectedRun.current = id
+    setActiveView('console')
     setLoading(true)
     try {
       const detail = await refreshRun(id)
-      if (!['completed', 'rejected', 'failed'].includes(detail.status)) connectEvents(id)
+      if (selectedRun.current === id && !['completed', 'rejected', 'failed'].includes(detail.status)) {
+        connectEvents(id, cursorFromEvents(detail.events))
+      }
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载失败')
     } finally {
@@ -186,8 +211,8 @@ function App() {
     try {
       await api.approve(run.id, approved, user?.username ?? approver, comment)
       setApprovalOpen(false)
-      await refreshRun(run.id)
-      connectEvents(run.id)
+      const detail = await refreshRun(run.id)
+      if (selectedRun.current === run.id) connectEvents(run.id, cursorFromEvents(detail.events))
       message.success(approved ? '审批已提交，开始执行受控工具' : '已拒绝，写操作不会执行')
     } catch (error) {
       message.error(error instanceof Error ? error.message : '审批失败')
@@ -231,8 +256,8 @@ function App() {
           type: 'line',
           smooth: true,
           symbolSize: 7,
-          lineStyle: { color: '#37d3aa', width: 3 },
-          itemStyle: { color: '#37d3aa', borderColor: '#07111f', borderWidth: 2 },
+          lineStyle: { color: '#3b82f6', width: 2 },
+          itemStyle: { color: '#3b82f6', borderColor: '#111827', borderWidth: 2 },
           areaStyle: {
             color: {
               type: 'linear',
@@ -241,8 +266,8 @@ function App() {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(55,211,170,.28)' },
-                { offset: 1, color: 'rgba(55,211,170,0)' },
+                { offset: 0, color: 'rgba(59,130,246,.18)' },
+                { offset: 1, color: 'rgba(59,130,246,0)' },
               ],
             },
           },
@@ -268,19 +293,19 @@ function App() {
           </div>
         </div>
 
-        <div className="sidebar-section-label">工作台</div>
+        <div className="sidebar-section-label">系统导航</div>
         <nav className="sidebar-nav" aria-label="主要导航">
-          <button type="button" className="sidebar-nav-item active"><RobotOutlined /><span>异常控制台</span></button>
-          <button type="button" className="sidebar-nav-item"><ClockCircleOutlined /><span>异常任务</span><span className="nav-count">{history.length}</span></button>
-          <button type="button" className="sidebar-nav-item"><AuditOutlined /><span>评测中心</span></button>
-          <button type="button" className="sidebar-nav-item"><SafetyCertificateOutlined /><span>审计日志</span></button>
+          <button type="button" className={`sidebar-nav-item ${activeView === 'console' ? 'active' : ''}`} onClick={() => setActiveView('console')}><RobotOutlined /><span>异常控制台</span></button>
+          <button type="button" className={`sidebar-nav-item ${activeView === 'tasks' ? 'active' : ''}`} onClick={() => setActiveView('tasks')}><ClockCircleOutlined /><span>异常任务</span><span className="nav-count">{history.length}</span></button>
+          <button type="button" className={`sidebar-nav-item ${activeView === 'evaluation' ? 'active' : ''}`} onClick={() => setActiveView('evaluation')}><AuditOutlined /><span>评测中心</span></button>
+          <button type="button" className={`sidebar-nav-item ${activeView === 'audit' ? 'active' : ''}`} onClick={() => setActiveView('audit')}><SafetyCertificateOutlined /><span>审计日志</span></button>
         </nav>
 
-        <div className="sidebar-section-label">运行环境</div>
+        <div className="sidebar-section-label">服务状态</div>
         <div className="environment-card">
-          <div><span className="environment-dot" />SIMULATION</div>
-          <span>MySQL · Milvus · MCP</span>
-          <span>LangGraph checkpoint 已启用</span>
+          <div><span className="environment-dot" />模拟环境</div>
+          <span>MySQL · Redis · Milvus · Neo4j</span>
+          <span>Celery · MCP · A2A · checkpoint</span>
         </div>
 
         <div className="sidebar-spacer" />
@@ -288,7 +313,7 @@ function App() {
           <div className="sidebar-operator">
             <div className="operator-avatar"><UserOutlined /></div>
             <div>
-              <strong>{user.display_name}</strong>
+              <strong>{user.roles.includes('SUPERVISOR') ? '生产主管-刘工' : user.display_name}</strong>
               <span>{user.roles.includes('SUPERVISOR') ? 'SUPERVISOR' : 'OPERATOR'}</span>
             </div>
           </div>
@@ -298,8 +323,8 @@ function App() {
       <Layout className="app-workspace">
       <Header className="app-header">
         <div className="header-context">
-          <span>生产运营 / 异常处置</span>
-          <strong>异常诊断指挥台</strong>
+          <span>{VIEW_CONTEXT[activeView].breadcrumb}</span>
+          <strong>{VIEW_CONTEXT[activeView].title}</strong>
         </div>
         <Space size="middle" className="header-actions">
           <Badge status="processing" text={<span className="muted">Agent Service 在线</span>} />
@@ -309,23 +334,23 @@ function App() {
               <Button type="text" size="small" icon={<LogoutOutlined />} onClick={logout} />
             </Space>
           )}
-          <Tag className="simulation-tag">SIMULATION</Tag>
+          <Tag className="simulation-tag">模拟环境</Tag>
         </Space>
       </Header>
 
       <Content className="app-content">
+        {activeView === 'console' && <>
         <section className="command-panel">
           <div className="command-intro">
-            <Text className="eyebrow">INCIDENT COMMAND</Text>
-            <Title level={2}>用证据驱动生产异常闭环</Title>
-            <Paragraph className="lead">Agent 查询生产、设备、质量与知识数据；确定性程序先计算统计证据，高风险写操作必须经过人工审批。</Paragraph>
-            <Space size={8} wrap className="scope-tags">
-              <Tag>LINE-02</Tag><Tag>激光打码</Tag><Tag>质量异常</Tag>
-            </Space>
+            <Title level={2}>新建诊断任务</Title>
+            <Paragraph className="lead">输入设备、产线或质量异常。系统将查询 MES 数据、执行统计分析，并根据 SOP 生成带证据的处置建议。</Paragraph>
           </div>
           <div className="query-box">
             <div className="query-field">
-              <span className="query-label">输入异常描述</span>
+              <div className="query-label-row">
+                <span className="query-label">异常描述</span>
+                <span className="query-context">最多 500 字</span>
+              </div>
               <TextArea value={query} onChange={(event) => setQuery(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={500} />
             </div>
             <Button type="primary" size="large" icon={<PlayCircleFilled />} loading={creating} onClick={startDiagnosis}>
@@ -334,43 +359,43 @@ function App() {
           </div>
         </section>
 
-        <Row gutter={[16, 16]} className="workspace-row">
-          <Col xs={24} lg={6}>
-            <Card className="surface history-card" bordered={false}>
-              <div className="section-heading">
-                <div><ClockCircleOutlined /> 最近任务</div>
-                <Text type="secondary">{history.length} 条 · 实时</Text>
-              </div>
-              <List
-                dataSource={history}
-                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" /> }}
-                renderItem={(item) => (
-                  <button className={`history-item ${run?.id === item.id ? 'active' : ''}`} onClick={() => openRun(item.id)}>
-                    <div className="history-top">
-                      <Text>{item.line_id}</Text>
-                      <Tag color={STATUS[item.status].color}>{STATUS[item.status].text}</Tag>
-                    </div>
-                    <div className="history-query">{item.query}</div>
-                    <div className="history-time">{new Date(item.created_at).toLocaleString()}</div>
-                  </button>
-                )}
-              />
-            </Card>
-          </Col>
+        <Card className="surface recent-runs-card" bordered={false}>
+          <div className="recent-runs-header">
+            <div>
+              <ClockCircleOutlined />
+              <strong>最近任务</strong>
+              <Text type="secondary">最近 4 条诊断记录</Text>
+            </div>
+            <Button type="text" size="small" onClick={() => setActiveView('tasks')}>查看全部 {history.length} 条 →</Button>
+          </div>
+          {history.length > 0 ? (
+            <div className="recent-runs-grid">
+              {history.slice(0, 4).map((item) => (
+                <button className={`recent-run-item ${run?.id === item.id ? 'active' : ''}`} key={item.id} onClick={() => openRun(item.id)}>
+                  <div className="recent-run-top">
+                    <span>{item.line_id}</span>
+                    <Tag color={STATUS[item.status].color}>{STATUS[item.status].text}</Tag>
+                  </div>
+                  <strong>{item.query}</strong>
+                  <small>{new Date(item.created_at).toLocaleString('zh-CN')}</small>
+                </button>
+              ))}
+            </div>
+          ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" />}
+        </Card>
 
-          <Col xs={24} lg={18}>
-            <Spin spinning={loading}>
+        <Spin spinning={loading}>
               {!run ? (
                 <Card className="surface empty-stage" bordered={false}>
-                  <div className="empty-visual"><RobotOutlined /></div>
-                  <Text className="eyebrow">READY FOR INCIDENT</Text>
-                  <Title level={3}>选择历史任务，或发起一次新诊断</Title>
-                  <Text type="secondary">示例数据已经准备好，启动后可观看从分析、审批到验证的完整闭环。</Text>
-                  <div className="capability-grid">
-                    <div><DatabaseOutlined /><strong>多源数据</strong><span>MES / 告警 / 质量</span></div>
-                    <div><FileSearchOutlined /><strong>证据检索</strong><span>手册 / SOP / 维修记录</span></div>
-                    <div><SafetyCertificateOutlined /><strong>安全执行</strong><span>RBAC / 审批 / 审计</span></div>
-                  </div>
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={
+                      <div className="empty-copy">
+                        <strong>暂无选中的诊断任务</strong>
+                        <span>可从最近任务中选择一条记录，或在上方创建新任务。</span>
+                      </div>
+                    }
+                  />
                 </Card>
               ) : (
                 <Space direction="vertical" size={20} style={{ width: '100%' }}>
@@ -427,8 +452,7 @@ function App() {
                     </div>
                   </div>
 
-                  <Row gutter={[20, 20]}>
-                    <Col xs={24} lg={10}>
+                  <div className="analysis-grid">
                       <Card className="surface timeline-card" bordered={false} title={<span><RobotOutlined /> Agent 执行工作流</span>} extra={<Text type="secondary">实时审计</Text>}>
                         <Timeline>
                           {run.events.map((event) => (
@@ -443,12 +467,10 @@ function App() {
                           ))}
                         </Timeline>
                       </Card>
-                    </Col>
-                    <Col xs={24} lg={14}>
-                      <Space direction="vertical" size={20} style={{ width: '100%' }}>
-                        <Card className="surface chart-card" bordered={false} title="最近20批次良率趋势与验证窗口" extra={<Tag color="cyan">DETERMINISTIC</Tag>}>
+                      <Space className="analysis-primary-stack" direction="vertical" size={20} style={{ width: '100%' }}>
+                        <Card className="surface chart-card" bordered={false} title="最近 20 批次良率趋势" extra={<Tag color="blue">程序计算</Tag>}>
                           {(run.state.quality?.length ?? 0) > 0 ? <ReactECharts option={chartOption} style={{ height: 280 }} /> : <Empty description="等待质量数据" />}
-                          {run.state.verification && <Alert type="info" showIcon message={run.state.verification.note} />}
+                          {run.state.verification && <Alert type={run.state.verification.write_state_verified === false ? 'error' : 'info'} showIcon message={run.state.verification.note} />}
                         </Card>
 
                         {productionAnalysis && (
@@ -488,9 +510,11 @@ function App() {
                             />
                             <Alert
                               className="analytics-alert"
-                              type={productionAnalysis.recovery_validation.status === 'passed' ? 'success' : 'info'}
+                              type={run.state.verification?.write_state_verified === false ? 'error' : productionAnalysis.recovery_validation.status === 'passed' ? 'success' : 'info'}
                               showIcon
-                              message={productionAnalysis.recovery_validation.status === 'pending'
+                              message={run.state.verification?.write_state_verified === false
+                                ? '写入验证失败，暂停质量放行判断'
+                                : productionAnalysis.recovery_validation.status === 'pending'
                                 ? '处置后连续三批恢复验证：等待执行'
                                 : `连续达标 ${productionAnalysis.recovery_validation.current_consecutive_batches ?? 0}/${productionAnalysis.recovery_validation.required_consecutive_batches} 批`}
                             />
@@ -501,18 +525,16 @@ function App() {
                           <Card className="surface cause-card" bordered={false} title="首要根因假设">
                             <div className="cause-top">
                               <div>
-                                <Text className="eyebrow">PRIMARY HYPOTHESIS</Text>
                                 <Title level={4}>{topCause.cause}</Title>
                               </div>
-                              <Progress type="circle" width={74} percent={Math.round(topCause.confidence * 100)} strokeColor="#31d6a7" trailColor="#1a2a3e" />
+                              <Progress type="circle" width={68} percent={Math.round(topCause.confidence * 100)} strokeColor="#3b82f6" trailColor="#263241" />
                             </div>
                             <Paragraph>{topCause.reasoning}</Paragraph>
                             <Space wrap>{topCause.evidence_ids.map((id) => <Tag key={id}>{id}</Tag>)}</Space>
                           </Card>
                         )}
                       </Space>
-                    </Col>
-                  </Row>
+                  </div>
 
                   {hypotheses.length > 0 && (
                     <Card className="surface" bordered={false} title={<span><AuditOutlined /> 根因候选与置信度</span>}>
@@ -535,7 +557,11 @@ function App() {
                   {evidence.length > 0 && <EvidencePanel evidence={evidence} />}
 
                   {run.report && (
-                    <Card className="surface report-card" bordered={false} title={<span><CheckCircleFilled /> 事故报告 {run.report.report_id}</span>}>
+                    <Card className="surface report-card" bordered={false} title={<span>{run.report.outcome === 'failed' ? <WarningFilled /> : <CheckCircleFilled />} 事故报告 {run.report.report_id}</span>}>
+                      {run.state.verification?.write_state_verified === false && (
+                        <Alert type="error" showIcon message="写入验证失败，需人工核查"
+                          description={<>{run.state.verification.note}<br />{run.state.verification.next_steps?.join(' ')}</>} />
+                      )}
                       <Descriptions column={{ xs: 1, md: 3 }}>
                         <Descriptions.Item label="结论" span={3}>{run.report.conclusion}</Descriptions.Item>
                         <Descriptions.Item label="状态"><Tag color={STATUS[run.status].color}>{STATUS[run.status].text}</Tag></Descriptions.Item>
@@ -543,14 +569,16 @@ function App() {
                         <Descriptions.Item label="审批人">{run.approval?.approver ?? '--'}</Descriptions.Item>
                       </Descriptions>
                       <Divider />
-                      <Alert type="success" showIcon message={run.report.data_notice} />
+                      <Alert type="info" showIcon message={run.report.data_notice} />
                     </Card>
                   )}
                 </Space>
               )}
-            </Spin>
-          </Col>
-        </Row>
+        </Spin>
+        </>}
+        {activeView === 'tasks' && <TaskCenter history={history} onOpen={openRun} onRefresh={refreshHistory} />}
+        {activeView === 'evaluation' && <EvaluationCenter />}
+        {activeView === 'audit' && <AuditLogCenter />}
       </Content>
 
       <Modal
@@ -605,6 +633,283 @@ function App() {
   )
 }
 
+function TaskCenter({
+  history,
+  onOpen,
+  onRefresh,
+}: {
+  history: RunSummary[]
+  onOpen: (id: string) => Promise<void>
+  onRefresh: () => Promise<void>
+}) {
+  const completed = history.filter((item) => item.status === 'completed').length
+  const pending = history.filter((item) => item.status === 'awaiting_approval').length
+  const failed = history.filter((item) => item.status === 'failed').length
+
+  return (
+    <section className="page-view">
+      <div className="page-title-row">
+        <div>
+          <Title level={2}>异常任务</Title>
+          <Paragraph>查看诊断任务状态、风险等级和闭环结果，点击任务可进入控制台查看证据链。</Paragraph>
+        </div>
+        <Button icon={<ReloadOutlined />} onClick={() => onRefresh()}>刷新任务</Button>
+      </div>
+
+      <div className="overview-strip">
+        <div><span>任务总数</span><strong>{history.length}</strong><small>最近 30 条</small></div>
+        <div className="success"><span>已完成</span><strong>{completed}</strong><small>闭环报告已生成</small></div>
+        <div className="warning"><span>等待审批</span><strong>{pending}</strong><small>写操作仍被暂停</small></div>
+        <div className="danger"><span>执行失败</span><strong>{failed}</strong><small>需要人工复核</small></div>
+      </div>
+
+      <Card className="surface data-card" bordered={false} title="全部异常任务" extra={<Text type="secondary">点击“查看详情”进入诊断控制台</Text>}>
+        <Table<RunSummary>
+          className="operations-table"
+          rowKey="id"
+          dataSource={history}
+          scroll={{ x: 960 }}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+          columns={[
+            {
+              title: '任务',
+              dataIndex: 'query',
+              width: 380,
+              render: (value: string, item) => (
+                <div className="table-primary">
+                  <strong>{value}</strong>
+                  <span>RUN {item.id.slice(0, 8).toUpperCase()}</span>
+                </div>
+              ),
+            },
+            { title: '产线', dataIndex: 'line_id', width: 110 },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              width: 120,
+              render: (value: RunStatus) => <Tag color={STATUS[value].color}>{STATUS[value].text}</Tag>,
+            },
+            {
+              title: '严重度',
+              dataIndex: 'severity',
+              width: 110,
+              render: (value?: string) => value ? <Tag color={value === 'critical' ? 'red' : 'orange'}>{value}</Tag> : '--',
+            },
+            {
+              title: '创建时间',
+              dataIndex: 'created_at',
+              width: 180,
+              render: (value: string) => new Date(value).toLocaleString('zh-CN'),
+            },
+            {
+              title: '操作',
+              key: 'action',
+              fixed: 'right',
+              width: 110,
+              render: (_, item) => <Button type="link" onClick={() => onOpen(item.id)}>查看详情</Button>,
+            },
+          ]}
+        />
+      </Card>
+    </section>
+  )
+}
+
+function EvaluationCenter() {
+  const [report, setReport] = useState<EvaluationReport | null>(null)
+  const [loadingReport, setLoadingReport] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadReport = useCallback(async () => {
+    setLoadingReport(true)
+    setError('')
+    try {
+      setReport(await api.evaluationReport())
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '评测报告加载失败')
+    } finally {
+      setLoadingReport(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReport()
+  }, [loadReport])
+
+  const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+
+  return (
+    <section className="page-view">
+      <div className="page-title-row">
+        <div>
+          <Title level={2}>评测中心</Title>
+          <Paragraph>查看离线回归、安全场景和 LangSmith 实验结果，包括保留的失败案例。</Paragraph>
+        </div>
+        <Button icon={<ReloadOutlined />} loading={loadingReport} onClick={loadReport}>重新加载</Button>
+      </div>
+
+      {error && <Alert type="error" showIcon message="无法读取评测报告" description={error} />}
+      <Spin spinning={loadingReport}>
+        {report && <>
+          <div className="overview-strip evaluation-overview">
+            <div><span>回归数据集</span><strong>{report.dataset_size}</strong><small>{report.profile}</small></div>
+            <div className="success"><span>困难场景通过率</span><strong>{percent(report.metrics.scenario_pass_rate)}</strong><small>{report.counts.scenario_cases} 个场景</small></div>
+            <div className="warning"><span>完整任务成功率</span><strong>{percent(report.metrics.complete_task_success_rate)}</strong><small>包含安全降级结果</small></div>
+            <div className="success"><span>高风险违规率</span><strong>{percent(report.metrics.high_risk_violation_rate)}</strong><small>{report.counts.security_cases} 个安全案例</small></div>
+          </div>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} xl={16}>
+              <Card className="surface data-card" bordered={false} title="版本回归对比" extra={<Text type="secondary">最近生成：{new Date(report.generated_at).toLocaleString('zh-CN')}</Text>}>
+                <Table
+                  className="operations-table"
+                  rowKey="version"
+                  dataSource={report.profile_comparison}
+                  pagination={false}
+                  scroll={{ x: 900 }}
+                  columns={[
+                    { title: '版本', dataIndex: 'version', width: 210 },
+                    { title: '样本', dataIndex: 'sample_size', width: 80 },
+                    { title: '任务成功率', dataIndex: 'complete_task_success_rate', width: 120, render: percent },
+                    { title: '有据可依率', dataIndex: 'grounded_hypothesis_rate', width: 120, render: percent },
+                    { title: '工具准确率', dataIndex: 'tool_selection_accuracy', width: 120, render: percent },
+                    { title: '模型直出', dataIndex: 'model_success_rate', width: 110, render: (value?: number | null) => value == null ? '不适用' : percent(value) },
+                    { title: 'P95', dataIndex: 'p95_response_time_ms', width: 110, render: (value: number) => `${value} ms` },
+                    { title: '平均 Token', dataIndex: 'average_tokens', width: 110 },
+                  ]}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} xl={8}>
+              <Card className="surface quality-card" bordered={false} title="关键质量门禁">
+                <div className="quality-gates">
+                  <div><span>意图分类准确率</span><Progress percent={report.metrics.intent_classification_accuracy * 100} strokeColor="#4ee1b6" /></div>
+                  <div><span>Recall@4</span><Progress percent={report.metrics.retrieval_recall_at_4 * 100} strokeColor="#67a7ff" /></div>
+                  <div><span>根因引用有效率</span><Progress percent={report.metrics.grounded_hypothesis_rate * 100} strokeColor="#4ee1b6" /></div>
+                  <div><span>工具选择准确率</span><Progress percent={report.metrics.tool_selection_accuracy * 100} strokeColor="#67a7ff" /></div>
+                </div>
+                {report.langsmith_experiment && (
+                  <a className="langsmith-link" href={report.langsmith_experiment.experiment_url} target="_blank" rel="noreferrer">
+                    <div><strong>{report.langsmith_experiment.experiment}</strong><span>{report.langsmith_experiment.run_count} 条托管运行</span></div>
+                    <LinkOutlined />
+                  </a>
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card className="surface" bordered={false} title={<span><WarningFilled /> 保留的失败案例</span>}>
+                <List
+                  dataSource={report.failed_cases}
+                  renderItem={(item) => (
+                    <List.Item className="failure-item">
+                      <List.Item.Meta title={<Space><Tag color="red">{item.id}</Tag>{item.scenario}</Space>} description={`期望：${item.expected} · 实际：${item.actual}`} />
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card className="surface" bordered={false} title="评测边界与限制">
+                <List dataSource={report.limitations} renderItem={(item) => <List.Item className="limitation-item">{item}</List.Item>} />
+              </Card>
+            </Col>
+          </Row>
+        </>}
+      </Spin>
+    </section>
+  )
+}
+
+function AuditLogCenter() {
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadLogs = useCallback(async () => {
+    setLoadingLogs(true)
+    setError('')
+    try {
+      setLogs(await api.listAuditLogs(200))
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '审计日志加载失败')
+    } finally {
+      setLoadingLogs(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadLogs()
+  }, [loadLogs])
+
+  const tools = new Set(logs.map((item) => item.tool)).size
+  const failed = logs.filter((item) => /fail|error|denied|blocked/i.test(item.outcome)).length
+  const averageDuration = logs.length ? Math.round(logs.reduce((sum, item) => sum + item.duration_ms, 0) / logs.length) : 0
+
+  return (
+    <section className="page-view">
+      <div className="page-title-row">
+        <div>
+          <Title level={2}>审计日志</Title>
+          <Paragraph>查看 MES、知识检索与写操作工具调用，支持按任务追溯参数、结果和耗时。</Paragraph>
+        </div>
+        <Button icon={<ReloadOutlined />} loading={loadingLogs} onClick={loadLogs}>刷新日志</Button>
+      </div>
+
+      {error && <Alert type="error" showIcon message="无法读取审计日志" description={error} />}
+      <div className="overview-strip">
+        <div><span>审计事件</span><strong>{logs.length}</strong><small>最近 200 条</small></div>
+        <div className="success"><span>受控工具</span><strong>{tools}</strong><small>MCP / RAG / MES</small></div>
+        <div className={failed ? 'danger' : 'success'}><span>失败或阻断</span><strong>{failed}</strong><small>安全失败同样留痕</small></div>
+        <div><span>平均耗时</span><strong>{averageDuration} ms</strong><small>端到端工具调用</small></div>
+      </div>
+
+      <Card className="surface data-card" bordered={false} title="工具调用审计流水" extra={<Tag color="blue">数据库记录</Tag>}>
+        <Table<AuditLog>
+          className="operations-table audit-table"
+          rowKey="id"
+          loading={loadingLogs}
+          dataSource={logs}
+          pagination={{ pageSize: 12, showSizeChanger: false }}
+          scroll={{ x: 1180 }}
+          columns={[
+            {
+              title: '时间',
+              dataIndex: 'created_at',
+              width: 180,
+              render: (value: string) => new Date(value).toLocaleString('zh-CN'),
+            },
+            {
+              title: '任务',
+              dataIndex: 'run_id',
+              width: 135,
+              render: (value: string) => <Text code>{value.slice(0, 12)}</Text>,
+            },
+            { title: '执行者', dataIndex: 'actor', width: 120 },
+            { title: '工具', dataIndex: 'tool', width: 140, render: (value: string) => <Tag color="blue">{value}</Tag> },
+            { title: '操作', dataIndex: 'operation', width: 190 },
+            {
+              title: '受控参数',
+              dataIndex: 'parameters',
+              width: 300,
+              render: (value: Record<string, unknown>) => <Text className="parameter-json">{JSON.stringify(value)}</Text>,
+            },
+            {
+              title: '结果',
+              dataIndex: 'outcome',
+              width: 130,
+              render: (value: string) => <Tag color={/fail|error|denied|blocked/i.test(value) ? 'red' : 'green'}>{value}</Tag>,
+            },
+            { title: '耗时', dataIndex: 'duration_ms', width: 90, render: (value: number) => `${value} ms` },
+          ]}
+        />
+      </Card>
+    </section>
+  )
+}
+
 function EvidencePanel({ evidence }: { evidence: Evidence[] }) {
   const sourceLabel: Record<Evidence['source_type'], { text: string; color: string }> = {
     mes: { text: 'MES', color: 'blue' },
@@ -613,6 +918,8 @@ function EvidencePanel({ evidence }: { evidence: Evidence[] }) {
     maintenance: { text: '维修', color: 'purple' },
     knowledge: { text: 'SOP / 手册', color: 'green' },
     analytics: { text: '统计分析', color: 'gold' },
+    graph: { text: '故障图谱', color: 'geekblue' },
+    a2a: { text: '厂商 A2A', color: 'magenta' },
   }
   return (
     <Card className="surface" bordered={false} title={<span><FileSearchOutlined /> 证据与段落引用</span>} extra={<Text type="secondary">所有结论可回溯</Text>}>

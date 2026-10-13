@@ -37,6 +37,10 @@ class SecurityIntegrationTest {
                 .bodyValue(new HashMap<String, Object>())
                 .exchange()
                 .expectStatus().isForbidden();
+        client.get().uri("/api/audit-logs")
+                .header(HttpHeaders.COOKIE, cookie)
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test

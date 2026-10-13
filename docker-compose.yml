@@ -15,6 +15,32 @@ services:
       timeout: 5s
       retries: 20
 
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    ports: ["6380:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-factorypilot-graph}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    ports: ["7475:7474", "7688:7687"]
+    volumes: ["neo4j-data:/data", "neo4j-logs:/logs"]
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-factorypilot-graph} 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
   etcd:
     image: quay.io/coreos/etcd:v3.5.18
     environment:
@@ -55,14 +81,33 @@ services:
       DATA_BACKEND: mysql
       DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
       CHECKPOINT_PATH: /data/checkpoints.db
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_FAIL_OPEN: "false"
+      REDIS_LOCK_TTL_SECONDS: 1800
+      TASK_QUEUE_BACKEND: celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_QUEUE: factorypilot
       KNOWLEDGE_BACKEND: milvus
       MILVUS_URI: http://milvus:19530
       MILVUS_COLLECTION: factorypilot_knowledge
       MILVUS_FAIL_OPEN: "false"
+      NEO4J_ENABLED: "true"
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-factorypilot-graph}
+      NEO4J_DATABASE: neo4j
+      NEO4J_FAIL_OPEN: "false"
       TOOL_TRANSPORT: mcp
       MES_MCP_URL: http://mes-mcp:8101/mcp
       KNOWLEDGE_MCP_URL: http://knowledge-mcp:8102/mcp
       ACTION_MCP_URL: http://action-mcp:8103/mcp
+      A2A_ENABLED: "true"
+      VENDOR_A2A_CARD_URL: http://vendor-agent:8200/.well-known/agent-card.json
+      VENDOR_A2A_PUBLIC_URL: http://vendor-agent:8200/a2a
+      VENDOR_A2A_TOKEN: ${VENDOR_A2A_TOKEN:-factorypilot-vendor-token}
+      A2A_FAIL_OPEN: "true"
       REQUIRE_GATEWAY_AUTH: "true"
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-factorypilot-compose-shared-secret}
       AGENT_MODE: ${AGENT_MODE:-demo}
@@ -74,7 +119,7 @@ services:
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,mysql,milvus,mes-mcp,knowledge-mcp,action-mcp,mes-gateway}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1},mysql,redis,neo4j,milvus,mes-mcp,knowledge-mcp,action-mcp,vendor-agent,mes-gateway,agent-service
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
@@ -84,8 +129,30 @@ services:
     ports: ["8001:8000"]
     depends_on:
       mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+      vendor-agent: {condition: service_healthy}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  vendor-agent:
+    build: ./agent-service
+    command: ["factorypilot-vendor-a2a"]
+    environment:
+      APP_HOST: 0.0.0.0
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_FAIL_OPEN: "false"
+      VENDOR_A2A_PUBLIC_URL: http://vendor-agent:8200/a2a
+      VENDOR_A2A_TOKEN: ${VENDOR_A2A_TOKEN:-factorypilot-vendor-token}
+    ports: ["8200:8200"]
+    depends_on:
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8200/health')"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -152,6 +219,67 @@ services:
       timeout: 5s
       retries: 20
 
+  agent-worker:
+    build: ./agent-service
+    command: ["celery", "-A", "factorypilot.task_queue:celery_app", "worker", "--loglevel=INFO", "--queues=factorypilot", "--concurrency=2"]
+    environment:
+      APP_ENV: production
+      DATA_BACKEND: mysql
+      DATABASE_URL: mysql://factorypilot:factorypilot@mysql:3306/factorypilot
+      CHECKPOINT_PATH: /data/checkpoints.db
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_FAIL_OPEN: "false"
+      REDIS_LOCK_TTL_SECONDS: 1800
+      TASK_QUEUE_BACKEND: celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_QUEUE: factorypilot
+      KNOWLEDGE_BACKEND: milvus
+      MILVUS_URI: http://milvus:19530
+      MILVUS_COLLECTION: factorypilot_knowledge
+      MILVUS_FAIL_OPEN: "false"
+      NEO4J_ENABLED: "true"
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-factorypilot-graph}
+      NEO4J_DATABASE: neo4j
+      NEO4J_FAIL_OPEN: "false"
+      TOOL_TRANSPORT: mcp
+      MES_MCP_URL: http://mes-mcp:8101/mcp
+      KNOWLEDGE_MCP_URL: http://knowledge-mcp:8102/mcp
+      ACTION_MCP_URL: http://action-mcp:8103/mcp
+      A2A_ENABLED: "true"
+      VENDOR_A2A_CARD_URL: http://vendor-agent:8200/.well-known/agent-card.json
+      VENDOR_A2A_PUBLIC_URL: http://vendor-agent:8200/a2a
+      VENDOR_A2A_TOKEN: ${VENDOR_A2A_TOKEN:-factorypilot-vendor-token}
+      A2A_FAIL_OPEN: "true"
+      AGENT_MODE: ${AGENT_MODE:-demo}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      LLM_FAIL_OPEN: ${LLM_FAIL_OPEN:-true}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1},mysql,redis,neo4j,milvus,mes-mcp,knowledge-mcp,action-mcp,vendor-agent,mes-gateway,agent-service
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      LANGSMITH_WORKSPACE_ID: ${LANGSMITH_WORKSPACE_ID:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-factorypilot}
+    volumes: ["checkpoint-data:/data"]
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+      milvus: {condition: service_healthy}
+      mes-mcp: {condition: service_healthy}
+      knowledge-mcp: {condition: service_healthy}
+      action-mcp: {condition: service_healthy}
+      vendor-agent: {condition: service_healthy}
+
   mes-gateway:
     build: ./mes-gateway
     environment:
@@ -165,6 +293,7 @@ services:
       mes-mcp: {condition: service_healthy}
       knowledge-mcp: {condition: service_healthy}
       action-mcp: {condition: service_healthy}
+      agent-worker: {condition: service_started}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
       interval: 10s
@@ -183,3 +312,6 @@ volumes:
   minio-data:
   milvus-data:
   checkpoint-data:
+  redis-data:
+  neo4j-data:
+  neo4j-logs:

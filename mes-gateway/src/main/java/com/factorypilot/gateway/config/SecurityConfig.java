@@ -70,6 +70,7 @@ public class SecurityConfig {
                 .pathMatchers("/api/auth/login", "/api/auth/logout", "/actuator/health", "/actuator/info").permitAll()
                 .pathMatchers("/api/auth/me").authenticated()
                 .pathMatchers(HttpMethod.POST, "/api/runs/*/approval").hasAnyRole("SUPERVISOR", "ADMIN")
+                .pathMatchers(HttpMethod.GET, "/api/audit-logs").hasAnyRole("SUPERVISOR", "ADMIN")
                 .pathMatchers("/api/**").authenticated()
                 .anyExchange().permitAll()
                 .and()

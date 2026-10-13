@@ -113,6 +113,7 @@ class MySQLDatabase(Database):
     """MySQL implementation preserving the repository's parameterized-query contract."""
 
     def __init__(self, url: str):
+        self.event_sink = None
         parsed = urlparse(url)
         if parsed.scheme not in {"mysql", "mysql+pymysql"}:
             raise ValueError("DATABASE_URL 必须使用 mysql:// 或 mysql+pymysql://")

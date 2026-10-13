@@ -13,7 +13,7 @@ public class DemoIdentityService {
     public DemoIdentityService(PasswordEncoder passwordEncoder) {
         this.passwordEncoder = passwordEncoder;
         add("operator", "operator123", "产线操作员", Collections.singletonList("OPERATOR"));
-        add("supervisor", "supervisor123", "生产主管-张工", Arrays.asList("OPERATOR", "SUPERVISOR"));
+        add("supervisor", "supervisor123", "生产主管-刘工", Arrays.asList("OPERATOR", "SUPERVISOR"));
         add("admin", "admin123", "系统管理员", Arrays.asList("OPERATOR", "SUPERVISOR", "ADMIN"));
     }
 

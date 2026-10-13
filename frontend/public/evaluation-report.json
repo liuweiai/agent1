@@ -1,0 +1,88 @@
+{
+  "generated_at": "2026-08-26T01:40:41.723260+00:00",
+  "profile": "credible-regression-v2",
+  "dataset_size": 80,
+  "metrics": {
+    "intent_classification_accuracy": 1.0,
+    "retrieval_recall_at_4": 1.0,
+    "scenario_pass_rate": 0.92,
+    "grounded_hypothesis_rate": 1.0,
+    "tool_selection_accuracy": 1.0,
+    "complete_task_success_rate": 0.75,
+    "high_risk_violation_rate": 0.0,
+    "p95_response_time_ms": 530
+  },
+  "counts": {
+    "intent_cases": 30,
+    "retrieval_cases": 25,
+    "scenario_cases": 25,
+    "security_cases": 8
+  },
+  "profile_comparison": [
+    {
+      "version": "纯规则基线",
+      "status": "completed",
+      "sample_size": 4,
+      "complete_task_success_rate": 0.75,
+      "grounded_hypothesis_rate": 1.0,
+      "tool_selection_accuracy": 1.0,
+      "model_success_rate": null,
+      "p95_response_time_ms": 530,
+      "average_tokens": 0,
+      "average_cost_usd": 0
+    },
+    {
+      "version": "DeepSeek + RAG",
+      "status": "completed",
+      "sample_size": 3,
+      "complete_task_success_rate": 1.0,
+      "grounded_hypothesis_rate": 1.0,
+      "tool_selection_accuracy": 1.0,
+      "model_success_rate": 0.6666666667,
+      "p95_response_time_ms": 62095,
+      "average_tokens": 4306,
+      "average_cost_usd": null
+    },
+    {
+      "version": "DeepSeek + RAG + Rerank",
+      "status": "completed",
+      "sample_size": 3,
+      "complete_task_success_rate": 1.0,
+      "grounded_hypothesis_rate": 1.0,
+      "tool_selection_accuracy": 1.0,
+      "model_success_rate": 0.3333333333,
+      "p95_response_time_ms": 62411,
+      "average_tokens": 2137,
+      "average_cost_usd": null
+    }
+  ],
+  "langsmith_experiment": {
+    "dataset": "factorypilot-regression-v1",
+    "experiment": "factorypilot-regression-cd6e1a5e",
+    "experiment_url": "https://apac.smith.langchain.com/o/2a99a337-3835-4ceb-8215-178a9b1b24d0/datasets/adde56ef-afa6-4f79-98e6-6f1e3b1e5157/compare?selectedSessions=ce0ad283-99f3-411f-a6a1-9994d6ff81c4",
+    "run_count": 55,
+    "ingestion_complete": true
+  },
+  "failed_cases": [
+    {
+      "id": "SCN-011",
+      "scenario": "multiple_devices",
+      "expected": "scope_separated",
+      "actual": "single_scope_only",
+      "passed": false
+    },
+    {
+      "id": "SCN-016",
+      "scenario": "empty_knowledge_result",
+      "expected": "degraded",
+      "actual": "continued_without_citation",
+      "passed": false
+    }
+  ],
+  "limitations": [
+    "全部 MES 业务数据仍为合成数据，指标用于回归而非生产承诺。",
+    "多设备联合诊断尚未实现，当前每个任务限制为单产线、单设备范围。",
+    "知识检索为空时工作流可继续，但尚未在状态中显式标记 citation degraded。",
+    "在线 DeepSeek 对比每组仅 3 条，只用于验证调用、降级和指标采集链路。"
+  ]
+}

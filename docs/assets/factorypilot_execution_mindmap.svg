@@ -1,0 +1,342 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3800" height="4138" viewBox="0 0 3800 4138" role="img" aria-label="FactoryPilot 从用户请求到事故报告完整思维导图"><rect width="100%" height="100%" fill="#F6F8FB"/>
+<text x="60" y="75" font-family="Microsoft YaHei, sans-serif" font-size="56" font-weight="700" fill="#283A50" dominant-baseline="central">FactoryPilot 从用户请求到事故报告</text>
+<text x="60" y="140" font-family="Microsoft YaHei, sans-serif" font-size="30" font-weight="400" fill="#60758E" dominant-baseline="central">代码核对版 · 2026-09-22 · 12 个主分支 · 16 个 LangGraph 节点 · 蓝色标记本次补齐</text>
+<rect x="1660" y="2054.0" width="480" height="210" rx="20" fill="#173B61" stroke="#173B61" stroke-width="2"/>
+<text x="1710" y="2112.0" font-family="Microsoft YaHei, sans-serif" font-size="46" font-weight="700" fill="#FFFFFF" dominant-baseline="central">FactoryPilot</text>
+<text x="1710" y="2170.0" font-family="Microsoft YaHei, sans-serif" font-size="34" font-weight="400" fill="#FFFFFF" dominant-baseline="central">MES 诊断与处置</text>
+<text x="1710" y="2223.0" font-family="Microsoft YaHei, sans-serif" font-size="26" font-weight="400" fill="#D3E4F4" dominant-baseline="central">同一 run_id 贯穿全程</text>
+<polyline points="1570,484.0 1570,3730.0" fill="none" stroke="#8094AC" stroke-width="5"/>
+<polyline points="1660,2159.0 1570,2159.0" fill="none" stroke="#8094AC" stroke-width="5"/>
+<polyline points="1570,484.0 1510,484.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="210" width="1450" height="548" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="80" y="230" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="102" y="263" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">01  用户请求与登录凭证</text>
+<text x="98" y="322" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">业务输入</text>
+<polyline points="109,366 127,366" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="366" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">React → POST /api/runs；JSON 包含 query 与 line_id。</text>
+<polyline points="109,402 127,402" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="402" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">query 描述异常；line_id 决定查询范围，当前默认 LINE-02。</text>
+<polyline points="109,438 127,438" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="438" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">文字提及的产线不会自动可靠覆盖 line_id，输入必须保持一致。</text>
+<polyline points="109,339 109,444" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="474" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">登录 Cookie</text>
+<polyline points="109,518 127,518" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="518" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">登录网关签发 JWT：sub、roles、display_name、exp。</text>
+<polyline points="109,554 127,554" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="554" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Set-Cookie 保存 factorypilot_token；HttpOnly 限制脚本读取。</text>
+<polyline points="109,590 127,590" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="590" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">fetch credentials: include；浏览器按 Cookie 规则携带凭证。</text>
+<polyline points="109,491 109,596" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="626" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">浏览器入口</text>
+<polyline points="109,670 127,670" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="670" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Docker 页面 localhost:3000 → Nginx /api → Java 网关。</text>
+<polyline points="109,706 127,706" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="706" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Cookie 身份与 query、line_id 等客户端业务参数分别处理。</text>
+<polyline points="109,643 109,706" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="1570,1162.0 1510,1162.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="906" width="1450" height="512" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="80" y="926" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="102" y="959" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">02  网关认证与角色权限</text>
+<text x="98" y="1018" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">Spring Security</text>
+<polyline points="109,1062 127,1062" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1062" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">JWT 验签和有效期检查 → Authentication。</text>
+<polyline points="109,1098 127,1098" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1098" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">登录等公开接口 permitAll；其余 /api/** 要求 authenticated。</text>
+<polyline points="109,1134 127,1134" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1134" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">审批 POST /api/runs/*/approval 要求 SUPERVISOR 或 ADMIN。</text>
+<polyline points="109,1035 109,1140" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="1170" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">匹配顺序</text>
+<polyline points="109,1214 127,1214" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1214" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">具体的审批与审计权限规则必须放在通用规则前。</text>
+<polyline points="109,1250 127,1250" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1250" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">roles 映射为 ROLE_ 前缀权限；以服务端认证信息为准。</text>
+<polyline points="109,1187 109,1256" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="1286" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">结果</text>
+<polyline points="109,1330 127,1330" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1330" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">未认证：401；已认证但角色不足：403。</text>
+<polyline points="109,1366 127,1366" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1366" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">角色校验通过仍需校验任务状态；不代表审批业务必然成功。</text>
+<polyline points="109,1303 109,1366" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="1570,1822.0 1510,1822.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="1566" width="1450" height="512" rx="20" fill="#FFFFFF" stroke="#5B91BA" stroke-width="2"/>
+<rect x="80" y="1586" width="1410" height="68" rx="12" fill="#EAF3FB" stroke="#EAF3FB" stroke-width="2"/>
+<text x="102" y="1619" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">03  Java 转发与可信审批身份</text>
+<text x="98" y="1678" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">AgentProxyController</text>
+<polyline points="109,1722 127,1722" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1722" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">WebClient 转发创建、查询、审批、SSE 请求到 Agent Service。</text>
+<polyline points="109,1758 127,1758" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1758" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">createRun 转发 JSON；响应状态与正文交回浏览器。</text>
+<polyline points="109,1695 109,1764" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="1794" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">审批身份覆盖</text>
+<polyline points="109,1838 127,1838" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1838" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">body.approver = authentication.getName()。</text>
+<polyline points="109,1874 127,1874" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1874" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">客户端修改 approver，无法冒充其他审批人。</text>
+<polyline points="109,1910 127,1910" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1910" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">角色是否允许审批由 SecurityConfig 判断；姓名覆盖负责审计归属。</text>
+<polyline points="109,1811 109,1916" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="1946" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">SSE 网关续传 · 已补齐</text>
+<polyline points="109,1990 127,1990" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="1990" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">读取 after 和 Last-Event-ID，校验为非负安全整数。</text>
+<polyline points="109,2026 127,2026" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2026" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">取两者较大值，作为 after 转发，保留下游 SSE id。</text>
+<polyline points="109,1963 109,2026" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="1570,2464.0 1510,2464.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="2190" width="1450" height="548" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="80" y="2210" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="102" y="2243" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">04  FastAPI 创建业务任务</text>
+<text x="98" y="2302" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">请求校验</text>
+<polyline points="109,2346 127,2346" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2346" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">RunCreate 校验 query 长度和 LINE-两位数字格式。</text>
+<polyline points="109,2382 127,2382" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2382" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">格式通过不等于产线存在，也不等于用户拥有该产线的数据权限。</text>
+<polyline points="109,2319 109,2388" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="2418" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">持久化</text>
+<polyline points="109,2462 127,2462" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2462" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">uuid.uuid4().hex → 32 位 run_id。</text>
+<polyline points="109,2498 127,2498" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2498" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">runs：query、line_id、queued、state_json={}、创建时间。</text>
+<polyline points="109,2534 127,2534" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2534" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">run_events：request/completed，表示接收请求这个步骤完成。</text>
+<polyline points="109,2435 109,2540" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="2570" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">202 Accepted</text>
+<polyline points="109,2614 127,2614" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2614" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">提交调度后返回任务摘要，前端持 run_id 查详情。</text>
+<polyline points="109,2650 127,2650" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2650" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">queued 在投递前写入，不证明消息已进入 Celery。</text>
+<polyline points="109,2686 127,2686" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2686" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">重复提交产生新 run_id；数据库写入与消息投递不在同一事务。</text>
+<polyline points="109,2587 109,2686" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="1570,3106.0 1510,3106.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="2814" width="1450" height="584" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="80" y="2834" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="102" y="2867" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">05  后台调度与 Worker</text>
+<text x="98" y="2926" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">两种模式</text>
+<polyline points="109,2970 127,2970" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="2970" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">TASK_QUEUE_BACKEND=local：响应后运行 BackgroundTasks。</text>
+<polyline points="109,3006 127,3006" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3006" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">TASK_QUEUE_BACKEND=celery：发送消息 → Redis broker → Worker。</text>
+<polyline points="109,3042 127,3042" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3042" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Redis 保存消息，Worker 进程执行 Python 函数。</text>
+<polyline points="109,2943 109,3048" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="3078" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">start 与 resume</text>
+<polyline points="109,3122 127,3122" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3122" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">start：factorypilot.run.start(run_id)。</text>
+<polyline points="109,3158 127,3158" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3158" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">resume：factorypilot.run.resume(run_id, approval_json)。</text>
+<polyline points="109,3194 127,3194" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3194" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">业务 run_id 不变；start/resume 的 Celery task_id 不同。</text>
+<polyline points="109,3095 109,3200" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="3230" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">故障处理</text>
+<polyline points="109,3274 127,3274" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3274" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Worker 各自创建 AgentService；读取持久化任务与 checkpoint。</text>
+<polyline points="109,3310 127,3310" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3310" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">任务包装层最多重试 3 次；这是调度重试，不是自动重新审批。</text>
+<polyline points="109,3346 127,3346" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3346" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Celery 允许消息重投；确定性 task_id 不等于业务 exactly-once。</text>
+<polyline points="109,3247 109,3346" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="1570,3730.0 1510,3730.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="60" y="3438" width="1450" height="584" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="80" y="3458" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="102" y="3491" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">06  互斥执行与状态恢复</text>
+<text x="98" y="3550" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">执行锁</text>
+<polyline points="109,3594 127,3594" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3594" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">threading.Lock 保护 _running 集合的检查与登记。</text>
+<polyline points="109,3630 127,3630" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3630" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">可选 Redis SET NX EX，以 run_id 为粒度，owner 标识持锁者。</text>
+<polyline points="109,3666 127,3666" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3666" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">finally 清理登记；Lua 比较 owner 后删除锁。</text>
+<polyline points="109,3567 109,3672" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="3702" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">检查点</text>
+<polyline points="109,3746 127,3746" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3746" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">SqliteSaver 接入 compile；thread_id = run_id。</text>
+<polyline points="109,3782 127,3782" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3782" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">无状态：invoke(initial)；有待执行节点：invoke(None)。</text>
+<polyline points="109,3818 127,3818" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3818" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">审批恢复：invoke(Command(resume=approval))。</text>
+<polyline points="109,3719 109,3824" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="98" y="3854" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">边界</text>
+<polyline points="109,3898 127,3898" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3898" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">checkpoint、runs.state_json、run_events 是不同存储职责。</text>
+<polyline points="109,3934 127,3934" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3934" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Worker 重启恢复需要访问原 checkpoint；不是从 Python 某一行解冻。</text>
+<polyline points="109,3970 127,3970" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="140" y="3970" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Redis 锁默认 1800 秒且无续租；跨机器 checkpoint 仍需升级。</text>
+<polyline points="109,3871 109,3970" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,538.0 2230,3748.0" fill="none" stroke="#8094AC" stroke-width="5"/>
+<polyline points="2140,2159.0 2230,2159.0" fill="none" stroke="#8094AC" stroke-width="5"/>
+<polyline points="2230,538.0 2290,538.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="210" width="1450" height="656" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="2310" y="230" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="2332" y="263" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">07  显式图：Node、Edge、State</text>
+<text x="2328" y="322" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">16 个节点与汇合</text>
+<polyline points="2339,366 2357,366" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="366" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">START → triage → 四路并行：mes_data / alarm_data /</text>
+<polyline points="2339,402 2357,402" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="402" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">maintenance_data / knowledge_data → statistical_analysis。</text>
+<polyline points="2339,438 2357,438" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="438" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">再并行 graph_knowledge 与 vendor_expert，汇合到 rca → plan。</text>
+<polyline points="2339,474 2357,474" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="474" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">approval → execute → verify；拒绝走 reject；最终 report → END。</text>
+<polyline points="2339,510 2357,510" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="510" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">新增 verification_failed：由 verify 的条件边进入，再到 report。</text>
+<polyline points="2339,339 2339,516" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="546" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">共享 State</text>
+<polyline points="2339,590 2357,590" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="590" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">run_id、query、line_id、device_id：任务与设备范围。</text>
+<polyline points="2339,626 2357,626" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="626" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">quality、alarms、maintenance、documents：原始查询结果。</text>
+<polyline points="2339,662 2357,662" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="662" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">evidence 使用 operator.add 汇总；production_analysis 保存统计。</text>
+<polyline points="2339,698 2357,698" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="698" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">hypotheses、action_plan、approval、action_results、verification、report。</text>
+<polyline points="2339,563 2339,704" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="734" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">职责</text>
+<polyline points="2339,778 2357,778" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="778" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Triage / Data / RCA / Action 是职责划分，不要求独立进程或模型。</text>
+<polyline points="2339,814 2357,814" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="814" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">统计程序计算基线、变化、相关性、告警重合；RCA 解释证据。</text>
+<polyline points="2339,751 2339,814" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,1216.0 2290,1216.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="906" width="1450" height="620" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="2310" y="926" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="2332" y="959" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">08  工具、检索与根因分析</text>
+<text x="2328" y="1018" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">MCP 调用</text>
+<polyline points="2339,1062 2357,1062" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1062" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">mes-mcp：get_line_device / get_recent_quality /</text>
+<polyline points="2339,1098 2357,1098" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1098" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">get_recent_alerts / get_maintenance_history。</text>
+<polyline points="2339,1134 2357,1134" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1134" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">knowledge-mcp：search_knowledge；Milvus 或词法检索。</text>
+<polyline points="2339,1170 2357,1170" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1170" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">TOOL_TRANSPORT=mcp 时使用真实协议；inprocess 是本地调用。</text>
+<polyline points="2339,1035 2339,1176" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="1206" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">补充证据</text>
+<polyline points="2339,1250 2357,1250" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1250" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Neo4j：参数化故障路径查询；A2A：Agent Card 与厂商服务。</text>
+<polyline points="2339,1286 2357,1286" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1286" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">两者是独立客户端，不属于上述三个 MCP Server。</text>
+<polyline points="2339,1322 2357,1322" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1322" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">检索保留文档、章节、版本与证据 ID；候选混合打分排序。</text>
+<polyline points="2339,1223 2339,1328" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="1358" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">RCA 与计划</text>
+<polyline points="2339,1402 2357,1402" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1402" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Demo 规则引擎，或 LLM + Pydantic 校验；引用已有 evidence ID。</text>
+<polyline points="2339,1438 2357,1438" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1438" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">模型失败可降级为规则，并标记原因；不会跳过审批。</text>
+<polyline points="2339,1474 2357,1474" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1474" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">当前处置动作模板化；统计相关性和模型置信度不等于因果证明。</text>
+<polyline points="2339,1375 2339,1474" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,1858.0 2290,1858.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="1566" width="1450" height="584" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="2310" y="1586" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="2332" y="1619" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">09  人工审批与受控执行</text>
+<text x="2328" y="1678" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">approval 暂停</text>
+<polyline points="2339,1722 2357,1722" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1722" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">先写 awaiting_approval 与 waiting 事件，再 interrupt 暂停。</text>
+<polyline points="2339,1758 2357,1758" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1758" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">checkpoint 保存进度；本次调用返回并释放执行锁。</text>
+<polyline points="2339,1794 2357,1794" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1794" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">两类存储不在同一事务，状态显示与 checkpoint 存在短暂窗口。</text>
+<polyline points="2339,1695 2339,1800" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="1830" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">同一任务恢复</text>
+<polyline points="2339,1874 2357,1874" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1874" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">审批通过网关 RBAC 与任务状态检查，生成 approval_id。</text>
+<polyline points="2339,1910 2357,1910" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1910" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">Command(resume=approval) 使 interrupt 得到人工决定。</text>
+<polyline points="2339,1946 2357,1946" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="1946" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">审批节点从头进入；其前置事件用幂等键避免重复。</text>
+<polyline points="2339,1847 2339,1952" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="1982" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">execute / reject</text>
+<polyline points="2339,2026 2357,2026" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2026" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">批准：Action MCP 再查数据库审批记录，创建模拟工单、调整抽检。</text>
+<polyline points="2339,2062 2357,2062" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2062" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">拒绝：reject → report，不调用业务写工具。</text>
+<polyline points="2339,2098 2357,2098" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2098" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">动作白名单、参数校验、超时和审计；现有幂等仍有并发边界。</text>
+<polyline points="2339,1999 2339,2098" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,2482.0 2290,2482.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="2190" width="1450" height="584" rx="20" fill="#FFFFFF" stroke="#5B91BA" stroke-width="2"/>
+<rect x="2310" y="2210" width="1410" height="68" rx="12" fill="#EAF3FB" stroke="#EAF3FB" stroke-width="2"/>
+<text x="2332" y="2243" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">10  写后验证与失败分支 · 已补齐</text>
+<text x="2328" y="2302" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">verify 读回</text>
+<polyline points="2339,2346 2357,2346" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2346" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">直接读数据库：run_id + device_id 对应工单，以及 line_controls。</text>
+<polyline points="2339,2382 2357,2382" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2382" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">工单存在、产线设置存在、抽检周期=10 分钟，全部成立才通过。</text>
+<polyline points="2339,2418 2357,2418" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2418" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">读取异常抛出到任务层；业务读回不符进入显式失败分支。</text>
+<polyline points="2339,2319 2339,2424" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="2454" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">验证失败</text>
+<polyline points="2339,2498 2357,2498" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2498" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">verify → verification_failed → report；生成失败原因与人工核查建议。</text>
+<polyline points="2339,2534 2357,2534" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2534" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">不生成模拟恢复批次、不放行、不自动重放业务写操作。</text>
+<polyline points="2339,2570 2357,2570" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2570" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">先保存最终状态，再标记 runs.status=failed；重试不会改成成功。</text>
+<polyline points="2339,2471 2339,2576" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="2606" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">验证通过</text>
+<polyline points="2339,2650 2357,2650" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2650" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">再判断模拟良率 [96.8, 97.4, 97.9]：从最新批次向前计数。</text>
+<polyline points="2339,2686 2357,2686" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2686" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">连续 ≥3 批且每批 ≥97% 才 passed；示例仅 2 批，仍 observing。</text>
+<polyline points="2339,2722 2357,2722" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2722" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">工单创建不等于维修完成；没有采集真实新批次或自动恢复循环。</text>
+<polyline points="2339,2623 2339,2722" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,3088.0 2290,3088.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="2814" width="1450" height="548" rx="20" fill="#FFFFFF" stroke="#CCD6E2" stroke-width="2"/>
+<rect x="2310" y="2834" width="1410" height="68" rx="12" fill="#EDF1F6" stroke="#EDF1F6" stroke-width="2"/>
+<text x="2332" y="2867" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">11  报告、终态与页面展示</text>
+<text x="2328" y="2926" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">报告持久化</text>
+<polyline points="2339,2970 2357,2970" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="2970" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">report 汇总异常、范围、根因、审批、动作、验证与结论。</text>
+<polyline points="2339,3006 2357,3006" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3006" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">保存 runs.report_json，再写 report/completed 时间线事件。</text>
+<polyline points="2339,3042 2357,3042" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3042" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">report 事件完成表示报告生成成功，不代表业务处置成功。</text>
+<polyline points="2339,2943 2339,3048" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="3078" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">最终状态</text>
+<polyline points="2339,3122 2357,3122" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3122" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">拒绝 → rejected；写入验证失败 → failed；写入通过 → completed。</text>
+<polyline points="2339,3158 2357,3158" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3158" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">completed 可同时伴随质量 observing，仍需继续观察。</text>
+<polyline points="2339,3194 2357,3194" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3194" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">失败报告带 failure_reasons、readback、next_steps，页面红色提示。</text>
+<polyline points="2339,3095 2339,3200" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="3230" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">完成通知</text>
+<polyline points="2339,3274 2357,3274" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3274" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">最终图状态保存后更新终态；SSE 排空历史事件，再发送 done。</text>
+<polyline points="2339,3310 2357,3310" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3310" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">React 最后 GET 详情并刷新列表，然后结束该事件订阅。</text>
+<polyline points="2339,3247 2339,3310" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<polyline points="2230,3748.0 2290,3748.0" fill="none" stroke="#8094AC" stroke-width="3"/>
+<rect x="2290" y="3438" width="1450" height="620" rx="20" fill="#FFFFFF" stroke="#5B91BA" stroke-width="2"/>
+<rect x="2310" y="3458" width="1410" height="68" rx="12" fill="#EAF3FB" stroke="#EAF3FB" stroke-width="2"/>
+<text x="2332" y="3491" font-family="Microsoft YaHei, sans-serif" font-size="35" font-weight="700" fill="#173B61" dominant-baseline="central">12  SSE 续传与 React 刷新 · 已补齐</text>
+<text x="2328" y="3550" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">服务端事件日志</text>
+<polyline points="2339,3594 2357,3594" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3594" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">事件先写 run_events；Redis Pub/Sub 仅唤醒，数据库是补发来源。</text>
+<polyline points="2339,3630 2357,3630" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3630" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">after / Last-Event-ID → max 合法游标；查询 run_id 且 id&gt;cursor。</text>
+<polyline points="2339,3666 2357,3666" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3666" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">SSE 包含 id、timeline、data；心跳保活，终态发送 done。</text>
+<polyline points="2339,3567 2339,3672" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="3702" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">浏览器消费</text>
+<polyline points="2339,3746 2357,3746" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3746" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">每任务游标保存到 sessionStorage；打开连接传 ?after=游标。</text>
+<polyline points="2339,3782 2357,3782" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3782" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">原生 EventSource 自动重连发 Last-Event-ID；网关已接通。</text>
+<polyline points="2339,3818 2357,3818" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3818" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">timeline → 串行合并 GET → setRun → 成功后提交应用游标。</text>
+<polyline points="2339,3854 2357,3854" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3854" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">GET 失败保留旧应用游标并重试；旧事件去重，切换任务关闭旧流。</text>
+<polyline points="2339,3719 2339,3860" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2328" y="3890" font-family="Microsoft YaHei, sans-serif" font-size="29" font-weight="700" fill="#173B61" dominant-baseline="central">语义与验证</text>
+<polyline points="2339,3934 2357,3934" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3934" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">事件补发不会执行业务工具；不宣称业务副作用 exactly-once。</text>
+<polyline points="2339,3970 2357,3970" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="3970" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">同标签页刷新可复用游标；存储不可用时退回内存和历史重播。</text>
+<polyline points="2339,4006 2357,4006" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="2370" y="4006" font-family="Microsoft YaHei, sans-serif" font-size="27" font-weight="400" fill="#283A50" dominant-baseline="central">测试覆盖缺失工单、错误设置、终态重试、续传游标和前端刷新失败。</text>
+<polyline points="2339,3907 2339,4006" fill="none" stroke="#C6D2E0" stroke-width="2"/>
+<text x="60" y="4108" font-family="Microsoft YaHei, sans-serif" font-size="25" font-weight="400" fill="#60758E" dominant-baseline="central">用途：按节点与代码索引复述执行链路。模拟质量、模板计划和并发边界均保留真实说明；不要将演示结果描述为真实工厂验证。</text></svg>

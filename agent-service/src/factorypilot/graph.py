@@ -8,8 +8,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from .analysis_engine import RcaEngine
+from .a2a.client import DisabledVendorExpertClient, VendorExpertClient
 from .database import Database
 from .models import utc_now
+from .neo4j_knowledge import DisabledGraphKnowledgeTools, Neo4jFaultKnowledgeTools
 from .production_analytics import analyze_production_window, evaluate_recovery
 from .tools import KnowledgeTools, MesReadTools, SafeActionTools
 from .triage import classify_anomaly
@@ -29,6 +31,8 @@ class AgentState(TypedDict, total=False):
     maintenance: list[dict[str, Any]]
     documents: list[dict[str, Any]]
     production_analysis: dict[str, Any]
+    graph_context: list[dict[str, Any]]
+    vendor_expert: dict[str, Any]
     evidence: Annotated[list[dict[str, Any]], operator.add]
     hypotheses: list[dict[str, Any]]
     action_plan: list[dict[str, Any]]
@@ -46,12 +50,16 @@ class FactoryPilotGraph:
         knowledge_tools: KnowledgeTools,
         action_tools: SafeActionTools,
         rca_engine: RcaEngine,
+        graph_knowledge: DisabledGraphKnowledgeTools | Neo4jFaultKnowledgeTools,
+        vendor_expert: DisabledVendorExpertClient | VendorExpertClient,
     ):
         self.database = database
         self.mes = mes_tools
         self.knowledge = knowledge_tools
         self.actions = action_tools
         self.rca_engine = rca_engine
+        self.graph_knowledge = graph_knowledge
+        self.vendor_expert = vendor_expert
 
     def build(self, checkpointer: Any):
         builder = StateGraph(AgentState)
@@ -61,12 +69,15 @@ class FactoryPilotGraph:
         builder.add_node("maintenance_data", self.collect_maintenance_data)
         builder.add_node("knowledge_data", self.collect_knowledge_data)
         builder.add_node("statistical_analysis", self.analyze_production_data)
+        builder.add_node("graph_knowledge", self.collect_graph_knowledge)
+        builder.add_node("vendor_expert", self.consult_vendor_expert)
         builder.add_node("rca", self.root_cause_analysis)
         builder.add_node("plan", self.create_action_plan)
         builder.add_node("approval", self.request_approval)
         builder.add_node("execute", self.execute_actions)
         builder.add_node("reject", self.reject_actions)
         builder.add_node("verify", self.verify_result)
+        builder.add_node("verification_failed", self.handle_verification_failure)
         builder.add_node("report", self.generate_report)
 
         builder.add_edge(START, "triage")
@@ -76,11 +87,18 @@ class FactoryPilotGraph:
             ["mes_data", "alarm_data", "maintenance_data", "knowledge_data"],
             "statistical_analysis",
         )
-        builder.add_edge("statistical_analysis", "rca")
+        builder.add_edge("statistical_analysis", "graph_knowledge")
+        builder.add_edge("statistical_analysis", "vendor_expert")
+        builder.add_edge(["graph_knowledge", "vendor_expert"], "rca")
         builder.add_edge("rca", "plan")
         builder.add_edge("plan", "approval")
         builder.add_edge("execute", "verify")
-        builder.add_edge("verify", "report")
+        builder.add_conditional_edges(
+            "verify",
+            lambda state: "report" if state["verification"]["write_state_verified"] else "verification_failed",
+            {"report": "report", "verification_failed": "verification_failed"},
+        )
+        builder.add_edge("verification_failed", "report")
         builder.add_edge("reject", "report")
         builder.add_edge("report", END)
         return builder.compile(checkpointer=checkpointer)
@@ -270,6 +288,115 @@ class FactoryPilotGraph:
         )
         return {"production_analysis": analysis, "evidence": evidence}
 
+    def collect_graph_knowledge(self, state: AgentState) -> dict[str, Any]:
+        if not self.graph_knowledge.enabled:
+            self._event(
+                state,
+                "graph_knowledge",
+                "Neo4j 故障图谱",
+                "skipped",
+                "当前运行配置未启用 Neo4j 故障知识图谱",
+            )
+            return {"graph_context": []}
+        self._event(
+            state,
+            "graph_knowledge",
+            "Neo4j 故障图谱",
+            "running",
+            "沿设备型号、部件、故障模式、症状和处置关系检索故障路径",
+        )
+        model = str(state.get("device_context", {}).get("model") or "LM-5000")
+        paths = self.graph_knowledge.search_fault_paths(
+            state["run_id"], model, state["query"], 4
+        )
+        evidence = [
+            {
+                "id": f"GRAPH-{path['path_id']}",
+                "source_type": "graph",
+                "title": f"故障路径：{path['component']} → {path['failure']}",
+                "excerpt": (
+                    f"症状：{path['symptom']}；建议：{path['remedy']}；"
+                    f"风险：{path['risk']}"
+                ),
+                "source_ref": f"neo4j://{model}/{path['path_id']}#{path['sop_id']}:{path['section']}",
+                "score": min(0.96, 0.72 + 0.06 * int(path.get("matches") or 0)),
+            }
+            for path in paths
+        ]
+        self._event(
+            state,
+            "graph_knowledge",
+            "Neo4j 故障图谱",
+            "completed",
+            f"匹配到 {len(paths)} 条可解释的设备故障关系路径",
+            {"model": model, "paths": len(paths)},
+        )
+        return {"graph_context": paths, "evidence": evidence}
+
+    def consult_vendor_expert(self, state: AgentState) -> dict[str, Any]:
+        if not self.vendor_expert.enabled:
+            self._event(
+                state,
+                "vendor_expert",
+                "设备厂商专家 A2A",
+                "skipped",
+                "当前运行配置未启用外部设备厂商专家 Agent",
+            )
+            return {"vendor_expert": {}}
+        self._event(
+            state,
+            "vendor_expert",
+            "设备厂商专家 A2A",
+            "running",
+            "通过 Agent Card 发现独立厂商 Agent，并调用 A2A message/send",
+        )
+        alarms = state.get("alarms", [])
+        context = {
+            "query": state["query"],
+            "device_id": state.get("device_id"),
+            "model": state.get("device_context", {}).get("model", "LM-5000"),
+            "alarm_codes": [item.get("code") for item in alarms[:10]],
+            "production_analysis": state.get("production_analysis", {}),
+        }
+        result = self.vendor_expert.consult(state["run_id"], context)
+        if not result:
+            self._event(
+                state,
+                "vendor_expert",
+                "设备厂商专家 A2A",
+                "skipped",
+                "厂商 Agent 不可用，已按 fail-open 策略保留本地证据继续诊断",
+            )
+            return {"vendor_expert": {}}
+        causes = result.get("likely_causes", [])
+        evidence = [
+            {
+                "id": "A2A-VENDOR-1",
+                "source_type": "a2a",
+                "title": f"{result.get('agent_name', '设备厂商专家')}诊断建议",
+                "excerpt": (
+                    "；".join(
+                        f"{item.get('cause')}（置信度 {item.get('confidence')}，依据：{item.get('basis')}）"
+                        for item in causes[:3]
+                    )
+                    + f"；安全约束：{'；'.join(result.get('safety_constraints', []))}"
+                ),
+                "source_ref": f"{result.get('agent_card')}#task={result.get('task_id')}",
+                "score": max(
+                    [float(item.get("confidence", 0.0)) for item in causes] or [0.5]
+                ),
+            }
+        ]
+        self._event(
+            state,
+            "vendor_expert",
+            "设备厂商专家 A2A",
+            "completed",
+            f"厂商 Agent 返回 {len(causes)} 个故障模式和安全约束",
+            {"task_id": result.get("task_id"), "agent": result.get("agent_name")},
+        )
+        return {"vendor_expert": result, "evidence": evidence}
+
     def root_cause_analysis(self, state: AgentState) -> dict[str, Any]:
         self._event(state, "rca", "根因分析", "running", "RCAAgent 正在构建跨数据源证据链并校验置信度")
         hypotheses = self.rca_engine.analyze(state)
@@ -363,25 +490,71 @@ class FactoryPilotGraph:
 
     def verify_result(self, state: AgentState) -> dict[str, Any]:
         self._event(state, "verify", "处理结果验证", "running", "读取模拟工单与线控参数，并生成三批验证窗口")
-        order = self.database.fetch_one("SELECT * FROM work_orders WHERE run_id=? ORDER BY created_at DESC", (state["run_id"],))
+        order = self.database.fetch_one(
+            "SELECT * FROM work_orders WHERE run_id=? AND device_id=? ORDER BY created_at DESC",
+            (state["run_id"], state["device_id"]),
+        )
         control = self.database.fetch_one("SELECT * FROM line_controls WHERE line_id=?", (state["line_id"],))
-        verification_batches = [96.8, 97.4, 97.9]
+        failures = []
+        if not order:
+            failures.append("未找到当前任务和设备对应的维修工单")
+        if not control:
+            failures.append("未找到当前产线的抽检设置")
+        elif control["inspection_interval_minutes"] != 10:
+            failures.append(f"抽检周期应为 10 分钟，读回为 {control['inspection_interval_minutes']} 分钟")
+        write_verified = not failures
+        # Do not imply quality recovery when the prerequisite writes did not take effect.
+        verification_batches = [96.8, 97.4, 97.9] if write_verified else []
         recovery = evaluate_recovery(verification_batches)
+        if not write_verified:
+            recovery["status"] = "pending"
         verification = {
             "mode": "simulation",
-            "write_state_verified": bool(order and control and control["inspection_interval_minutes"] == 10),
+            "write_state_verified": write_verified,
+            "failure_reasons": failures,
+            "readback": {
+                "work_order_id": order["id"] if order else None,
+                "expected_inspection_interval_minutes": 10,
+                "actual_inspection_interval_minutes": control["inspection_interval_minutes"] if control else None,
+            },
             "baseline_yield": state.get("production_analysis", {}).get("anomaly", {}).get("average_yield", 91.0),
             "verification_batches": verification_batches,
-            "release_condition_met": recovery["release_condition_met"],
-            "note": "仅 2/3 批达到 97%，继续加严检验；此结果为演示模拟，不代表真实产线。",
+            "release_condition_met": write_verified and recovery["release_condition_met"],
+            "note": (
+                "仅 2/3 批达到 97%，继续加严检验；此结果为演示模拟，不代表真实产线。"
+                if write_verified else "写入读回验证失败：" + "；".join(failures) + "。暂停质量放行判断，需人工核查。"
+            ),
         }
         production_analysis = dict(state.get("production_analysis", {}))
         production_analysis["recovery_validation"] = recovery
-        self._event(state, "verify", "处理结果验证", "completed", verification["note"], verification)
+        self._event(state, "verify", "处理结果验证", "completed" if write_verified else "failed", verification["note"], verification)
         return {"verification": verification, "production_analysis": production_analysis}
+
+    def handle_verification_failure(self, state: AgentState) -> dict[str, Any]:
+        verification = dict(state["verification"])
+        verification["manual_intervention_required"] = True
+        verification["next_steps"] = [
+            "人工核对维修工单和当前抽检设置，确认是否存在部分写入或并发修改。",
+            "修正原因后重新提交处置并审批；本次任务不自动重复执行写工具。",
+        ]
+        self._event(
+            state, "verification_failed", "写入验证失败，转人工核查", "failed",
+            verification["note"], {"failure_reasons": verification["failure_reasons"], "next_steps": verification["next_steps"]},
+        )
+        return {"verification": verification}
 
     def generate_report(self, state: AgentState) -> dict[str, Any]:
         rejected = not state.get("approval", {}).get("approved")
+        verification = state.get("verification", {})
+        write_failed = not rejected and verification.get("write_state_verified") is not True
+        if rejected:
+            conclusion = "人工拒绝，工作流安全终止，未产生写操作。"
+        elif write_failed:
+            conclusion = verification.get("note", "缺少写入验证结果，需人工核查。")
+        elif verification.get("release_condition_met"):
+            conclusion = "模拟验证满足连续三批放行条件；不代表真实设备维修完成或真实产线已恢复。"
+        else:
+            conclusion = "处置写入已验证，模拟质量尚未满足放行条件；继续观察，当前任务不自动采集新批次。"
         report = {
             "report_id": f"IR-{state['run_id'][:8].upper()}",
             "generated_at": utc_now(),
@@ -394,7 +567,8 @@ class FactoryPilotGraph:
             "actions": state.get("action_results", []),
             "verification": state.get("verification"),
             "production_analysis": state.get("production_analysis"),
-            "conclusion": "人工拒绝，工作流安全终止，未产生写操作。" if rejected else "处置已执行，继续观察直至连续三批满足放行条件。",
+            "outcome": "rejected" if rejected else "failed" if write_failed else "completed",
+            "conclusion": conclusion,
             "data_notice": "本报告由 FactoryPilot 使用模拟 MES 数据生成。",
         }
         self.database.update_run(

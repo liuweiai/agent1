@@ -34,7 +34,9 @@ class ApprovalRequest(BaseModel):
 
 class Evidence(BaseModel):
     id: str
-    source_type: Literal["mes", "alarm", "quality", "maintenance", "knowledge", "analytics"]
+    source_type: Literal[
+        "mes", "alarm", "quality", "maintenance", "knowledge", "analytics", "graph", "a2a"
+    ]
     title: str
     excerpt: str
     source_ref: str
@@ -64,6 +66,18 @@ class TimelineEvent(BaseModel):
     status: Literal["running", "completed", "waiting", "failed", "skipped"]
     detail: str
     payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+
+
+class AuditLog(BaseModel):
+    id: int
+    run_id: str
+    actor: str
+    tool: str
+    operation: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    outcome: str
+    duration_ms: int
     created_at: str
 
 

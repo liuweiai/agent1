@@ -4,6 +4,12 @@ FactoryPilot 是一个面向 MES 场景的“生产异常诊断与闭环处置 A
 
 全部业务数据均为确定性合成数据，不包含实习公司数据。
 
+## 项目文档
+
+- [Word 项目说明与面试手册](docs/FactoryPilot项目说明与面试手册.docx)：67 页正式排版版本，整合项目说明、架构图、105 道面试问答和快速复习卡。
+- [详细项目说明](docs/PROJECT_GUIDE.md)：业务背景、技术架构、LangGraph 工作流、统计分析、MCP、RAG、安全、部署、评测、演示脚本与迭代边界。
+- [面试问题与参考答案](docs/INTERVIEW_QA.md)：项目介绍模板，以及 100+ 个架构、Agent、数据分析、RAG、安全、评测和生产化追问题。
+
 ## 已实现能力
 
 - LangGraph 并行证据收集、根因分析、风险计划、`interrupt` 审批、执行、验证和事故报告。
@@ -16,6 +22,10 @@ FactoryPilot 是一个面向 MES 场景的“生产异常诊断与闭环处置 A
 - Spring Boot WebFlux 网关、JWT HttpOnly Cookie、RBAC；只有 `SUPERVISOR`/`ADMIN` 可审批。
 - 网关向 Agent Service 注入共享密钥，生产模式禁止绕过网关直接访问业务 API。
 - SQLite checkpoint 持久化；服务重启后可按同一 `thread_id` 恢复人工审批任务。
+- Redis 提供跨进程任务锁、SSE 事件唤醒和 A2A 任务状态缓存；MySQL 仍是业务状态与事件的最终事实来源。
+- Celery + Redis Broker 将诊断与审批恢复任务投递到独立 Worker，支持 late ack、Worker 丢失拒绝、有限重试和确定性任务 ID。
+- Neo4j 保存“设备型号—部件—故障模式—症状—措施—SOP”故障路径，使用参数化只读 Cypher 为 RCA 增加多跳关系证据。
+- 独立设备厂商专家 Agent 通过 A2A v0.3 Agent Card 和 JSON-RPC `message/send` 对外提供能力，内部 LangGraph 节点仍直接编排。
 - React + TypeScript 操作台展示执行时间线、20 批趋势、统计证据、相关性、证据链、审批方案与报告。
 - pytest、MCP 协议测试、Spring Security 集成测试、前端构建、80 条本地回归集、真实 DeepSeek 配置对比与 LangSmith 在线评测入口。
 
@@ -24,10 +34,12 @@ FactoryPilot 是一个面向 MES 场景的“生产异常诊断与闭环处置 A
 ```text
 React :3000
   └─ Spring Gateway :8080  JWT / RBAC / SSE proxy
-       └─ FastAPI Agent :8000  LangGraph / checkpoint
-            ├─ mes-mcp :8101 ───────────────┐
-            ├─ knowledge-mcp :8102 ─ Milvus │─ MySQL
-            └─ action-mcp :8103 ────────────┘
+       └─ FastAPI Agent :8000 ── Redis/Celery ── Agent Worker
+            ├─ mes-mcp :8101 ─────────────────────┐
+            ├─ knowledge-mcp :8102 ─ Milvus       │─ MySQL
+            ├─ action-mcp :8103 ──────────────────┘
+            ├─ Neo4j 故障知识图谱
+            └─ A2A 厂商专家 Agent :8200
 ```
 
 ```mermaid
@@ -39,7 +51,11 @@ flowchart TD
     T --> K[Milvus SOP 检索]
     M --> S[确定性统计分析]
     A --> S
+    S --> G[Neo4j 故障路径]
+    S --> A2A[A2A 厂商专家]
     S --> R[RCAAgent]
+    G --> R
+    A2A --> R
     H --> R
     K --> R
     R --> C[证据与置信度检查]
@@ -78,6 +94,9 @@ docker compose ps
 - MCP：`http://localhost:8101/mcp`、`8102/mcp`、`8103/mcp`
 - Milvus：`localhost:19531`（避免占用本机已有的 `19530`）
 - MySQL：`localhost:3307`（避免占用本机已有的 `3306`）
+- Redis：`localhost:6380`（容器内 Broker 使用 `redis:6379`）
+- Neo4j Browser：<http://localhost:7475>，Bolt：`localhost:7688`
+- A2A Agent Card：<http://localhost:8200/.well-known/agent-card.json>
 
 查看日志或停止服务：
 
@@ -126,9 +145,16 @@ npm run dev
 | --- | --- | --- |
 | `DATA_BACKEND` | `sqlite` / `mysql` | 业务与审计数据 |
 | `DATABASE_URL` | `mysql://...` | MySQL 连接 |
+| `REDIS_ENABLED` | `true` | 分布式锁、事件唤醒和 A2A 状态缓存 |
+| `TASK_QUEUE_BACKEND` | `local` / `celery` | 本地后台任务或 Celery Worker |
+| `CELERY_BROKER_URL` | `redis://redis:6379/1` | 分布式任务 Broker |
 | `KNOWLEDGE_BACKEND` | `lexical` / `milvus` | 知识检索后端 |
 | `MILVUS_URI` | `http://milvus:19530` | Milvus 地址 |
+| `NEO4J_ENABLED` | `true` | 启用故障知识图谱证据 |
+| `NEO4J_URI` | `bolt://neo4j:7687` | 容器内 Neo4j 地址 |
 | `TOOL_TRANSPORT` | `inprocess` / `mcp` | 编排器工具传输 |
+| `A2A_ENABLED` | `true` | 启用独立厂商专家 Agent |
+| `VENDOR_A2A_TOKEN` | 随机长字符串 | A2A Bearer 认证 |
 | `REQUIRE_GATEWAY_AUTH` | `true` | 禁止直连业务 API |
 | `GATEWAY_SHARED_SECRET` | 随机长字符串 | 网关和 Agent 间认证 |
 | `JWT_SECRET` | 至少 32 字节 | JWT 签名密钥 |
@@ -136,7 +162,7 @@ npm run dev
 | `LANGSMITH_WORKSPACE_ID` | 工作区 UUID | 多工作区 Key 的目标工作区 |
 | `LANGSMITH_ENDPOINT` | US/EU/AWS API 地址 | LangSmith 区域端点 |
 
-Docker Compose 默认使用 `mysql + milvus + mcp + gateway auth` 完整组合。部署前必须替换 `.env` 中的共享密钥和 JWT 密钥。
+Docker Compose 默认使用 `mysql + redis/celery + milvus + neo4j + mcp + a2a + gateway auth` 完整组合。部署前必须替换 `.env` 中的共享密钥、JWT 密钥、Neo4j 密码和 A2A Token。
 
 ## API 与权限
 
@@ -226,13 +252,29 @@ $env:OPENAI_MODEL = "gpt-4.1-mini"
 4. 写工具只允许创建模拟维修工单和把抽检周期设置为 `5/10/15/30` 分钟。
 5. 工具调用记录 actor、参数、结果、耗时；事件使用幂等键防止恢复时重复写入。
 6. MCP 网络调用有超时、有限重试和最大工作流循环限制；Milvus 可按配置安全降级。
+7. A2A Client 先发现并校验 Agent Card，只接受同主机 HTTP(S) JSON-RPC endpoint；调用结果和耗时进入统一审计。
+8. Redis 锁使用随机 owner 与原子 compare-and-delete 释放，防止一个 Worker 误释放另一个 Worker 的锁。
 
 ## 后续可扩展项
+
+### 写后验证与 SSE 续传（2026-09-22 更新）
+
+- `verify` 按任务与设备读回维修工单，并检查当前产线抽检周期为 10 分钟。缺失或不符时进入 `verification_failed → report`，最终状态为 `failed`，报告保留失败原因和人工核查建议。此分支不自动重放业务写工具；部分写入不会自动回滚。
+- 写入验证通过后才运行三批模拟质量验证。固定示例 `[96.8, 97.4, 97.9]` 仅连续两批达到 97%，所以质量仍为 `observing`；它不是从真实产线读取的新批次，也没有自动监测循环。
+- SSE 使用数据库事件 ID 续传。网关和 Agent 同时支持 `after` 与原生 `Last-Event-ID`，取较大的合法值，避免自动重连沿用较旧 URL 游标。
+- 前端按 `run_id` 将已成功刷新详情的游标保存在 `sessionStorage`，重建连接时带上 `after`。事件刷新串行合并，失败 GET 不推进应用游标且有限间隔重试；收到 `done` 后仍保证最终详情刷新。切换任务会关闭旧订阅，避免旧响应覆盖当前任务。
+- 浏览器事件重播不会触发业务写操作。游标是恢复位置，不是权限凭证；现有 JWT/RBAC 检查仍生效。这不宣称业务副作用 exactly-once。
+
+完整导图与代码索引：[可折叠思维导图](docs/FactoryPilot执行链路思维导图.html) · [可编辑 Markdown](docs/FactoryPilot执行链路思维导图.md) · [SVG](docs/assets/factorypilot_execution_mindmap.svg)。
+
+相关回归：`agent-service/tests/test_verification_failure.py`、`agent-service/tests/test_sse_resume.py`、`mes-gateway/src/test/java/com/factorypilot/gateway/AgentProxyEventsTest.java`、`frontend/tests/runEvents.test.mjs`。前端测试使用 Node.js 18+：`cd frontend` 后运行 `npm test`，构建运行 `npm run build`。
+
+### 后续生产化方向
 
 - 使用企业 IdP/OIDC 替换内存演示账号，并将刷新令牌与用户管理落库。
 - 使用正式 Embedding 服务和 Milvus BM25 sparse field 替换无 Key 的确定性演示向量。
 - 为 MCP 增加服务级 OAuth/mTLS、熔断器和指标面板。
-- 增加独立部署的设备厂商专家 A2A Agent；内部 LangGraph 节点继续直接编排。
+- 将 SQLite checkpoint 升级为适合多主机 Worker 共享的数据库型 checkpointer，并加入锁续租与死信任务管理。
 - 在真实脱敏 MES 样本上建立人工标注集，补充 LLM-as-judge 和故障注入评测。
 
 ## 参考
