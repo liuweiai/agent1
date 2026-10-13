@@ -255,28 +255,6 @@ $env:OPENAI_MODEL = "gpt-4.1-mini"
 7. A2A Client 先发现并校验 Agent Card，只接受同主机 HTTP(S) JSON-RPC endpoint；调用结果和耗时进入统一审计。
 8. Redis 锁使用随机 owner 与原子 compare-and-delete 释放，防止一个 Worker 误释放另一个 Worker 的锁。
 
-## 后续可扩展项
-
-### 写后验证与 SSE 续传（2026-09-22 更新）
-
-- `verify` 按任务与设备读回维修工单，并检查当前产线抽检周期为 10 分钟。缺失或不符时进入 `verification_failed → report`，最终状态为 `failed`，报告保留失败原因和人工核查建议。此分支不自动重放业务写工具；部分写入不会自动回滚。
-- 写入验证通过后才运行三批模拟质量验证。固定示例 `[96.8, 97.4, 97.9]` 仅连续两批达到 97%，所以质量仍为 `observing`；它不是从真实产线读取的新批次，也没有自动监测循环。
-- SSE 使用数据库事件 ID 续传。网关和 Agent 同时支持 `after` 与原生 `Last-Event-ID`，取较大的合法值，避免自动重连沿用较旧 URL 游标。
-- 前端按 `run_id` 将已成功刷新详情的游标保存在 `sessionStorage`，重建连接时带上 `after`。事件刷新串行合并，失败 GET 不推进应用游标且有限间隔重试；收到 `done` 后仍保证最终详情刷新。切换任务会关闭旧订阅，避免旧响应覆盖当前任务。
-- 浏览器事件重播不会触发业务写操作。游标是恢复位置，不是权限凭证；现有 JWT/RBAC 检查仍生效。这不宣称业务副作用 exactly-once。
-
-完整导图与代码索引：[可折叠思维导图](docs/FactoryPilot执行链路思维导图.html) · [可编辑 Markdown](docs/FactoryPilot执行链路思维导图.md) · [SVG](docs/assets/factorypilot_execution_mindmap.svg)。
-
-相关回归：`agent-service/tests/test_verification_failure.py`、`agent-service/tests/test_sse_resume.py`、`mes-gateway/src/test/java/com/factorypilot/gateway/AgentProxyEventsTest.java`、`frontend/tests/runEvents.test.mjs`。前端测试使用 Node.js 18+：`cd frontend` 后运行 `npm test`，构建运行 `npm run build`。
-
-### 后续生产化方向
-
-- 使用企业 IdP/OIDC 替换内存演示账号，并将刷新令牌与用户管理落库。
-- 使用正式 Embedding 服务和 Milvus BM25 sparse field 替换无 Key 的确定性演示向量。
-- 为 MCP 增加服务级 OAuth/mTLS、熔断器和指标面板。
-- 将 SQLite checkpoint 升级为适合多主机 Worker 共享的数据库型 checkpointer，并加入锁续租与死信任务管理。
-- 在真实脱敏 MES 样本上建立人工标注集，补充 LLM-as-judge 和故障注入评测。
-
 ## 参考
 
 - [LangGraph Interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts)
